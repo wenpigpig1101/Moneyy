@@ -1,247 +1,550 @@
+```html
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>向錢衝 App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>💰 向錢衝</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#C3A995">
+  
   <style>
-    body { background-color: #F8F1EC; color: #4A3E3D; font-family: -apple-system, sans-serif; margin: 0; padding-bottom: 50px; }
-    header { background-color: #D0B8A8; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 50; }
-    .tabs { display: flex; background: white; border-bottom: 1px solid #E6DDD7; position: sticky; top: 52px; z-index: 40; }
-    .tab-btn { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: bold; border: none; background: none; color: #A0A0A0; border-bottom: 2px solid transparent; cursor: pointer; }
-    .tab-btn.active { color: #8D4B38; border-bottom-color: #8D4B38; background-color: #FDFBF7; }
-    .card { background: white; padding: 16px; margin: 12px; border: 1px solid #E6DDD7; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; margin: 8px 0; }
-    .grid-item { background: #FDFBF7; padding: 8px; border: 1px solid #E6DDD7; border-radius: 6px; font-size: 12px; }
-    .grid-item strong { display: block; font-size: 14px; margin-top: 2px; }
-    .total-banner { background: #8D4B38; color: white; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: bold; margin-top: 8px; }
-    .total-banner.market { background: #4A3E3D; }
-    .form-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-    input, select { padding: 8px; border: 1px solid #E6DDD7; border-radius: 6px; background: #FDFBF7; color: #4A3E3D; font-size: 12px; width: 100%; box-sizing: border-box; }
-    button.save-btn { width: 100%; background: #D0B8A8; color: white; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; margin-top: 8px; cursor: pointer; }
-    .list-item { background: white; padding: 12px; margin: 6px 12px; border-radius: 8px; border-left: 4px solid #D0B8A8; display: flex; justify-content: space-between; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .list-item.market { border-left-color: #4A3E3D; }
+    ::-webkit-scrollbar { display: none; }
+    
+    /* 終極防左右晃動設定 */
+    html, body {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden !important;
+      margin: 0;
+      padding: 0;
+      background-color: #FDFBF7; 
+      color: #5C4D42; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      -webkit-tap-highlight-color: transparent;
+      touch-action: pan-y; /* 核心：告訴手機只能上下滑，徹底禁止左右觸控滑動 */
+    }
+    #root {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden !important;
+    }
+
+    .pb-safe { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    
+    input[type="date"], input[type="text"], input[type="number"], select {
+      -webkit-appearance: none;
+      appearance: none;
+      background-color: #ffffff;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    input[type="date"] { min-height: 3rem; }
+    
+    .tab-active { color: #C3A995; border-bottom: 2px solid #C3A995; font-weight: bold; }
+    .tab-inactive { color: #A0A0A0; border-bottom: 2px solid transparent; font-weight: normal; }
   </style>
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1 style="margin:0; font-size:18px; tracking-wider">💰 向錢衝</h1>
-      <div>
-        <select id="select-year" style="width:auto; padding:2px; font-size:11px; background:white;">
-          <option value="2026" selected>2026年</option>
-          <option value="2025">2025年</option>
-        </select>
-        <select id="select-month" style="width:auto; padding:2px; font-size:11px; background:white;"></select>
-      </div>
-    </header>
-    <div class="tabs">
-      <button id="tab-conv" class="tab-btn active">📦 超商寄件</button>
-      <button id="tab-market" class="tab-btn">🎪 每日市場</button>
-      <button id="tab-stats" class="tab-btn">📊 營收統計</button>
-      <button id="tab-report" class="tab-btn">📅 对比報告</button>
-    </div>
-    <main id="main-content" style="max-width:400px; margin:0 auto;"></main>
-  </div>
+  <div id="root"></div>
 
-  <script>
-    const FEE_711 = 38, FEE_FAMILY = 39, REVENUE_RATE = 0.35;
-    let currentYear = 2026, currentMonth = 5, activeTab = 'convenience';
-    
-    let shippingRecords = JSON.parse(localStorage.getItem('shippingRecords')) || [];
-    let marketRecords = JSON.parse(localStorage.getItem('marketRecords')) || [];
-    
-    function saveData() { 
-      localStorage.setItem('shippingRecords', JSON.stringify(shippingRecords)); 
-      localStorage.setItem('marketRecords', JSON.stringify(marketRecords)); 
-    }
-    
-    document.getElementById('select-month').innerHTML = Array.from({length:12},(_, i)=>`<option value="${i+1}" ${i+1===currentMonth?'selected':''}>${i+1}月</option>`).join('');
-    
-    function calculateData(year, month) {
-      const fShipping = shippingRecords.filter(r => Number(r.year) === year && Number(r.month) === month);
-      const sCount = fShipping.length;
-      const sTotalAmount = fShipping.reduce((sum, r) => sum + r.amount, 0);
-      const sRevenue = sTotalAmount * REVENUE_RATE;
-      const sTotalCost = fShipping.reduce((sum, r) => sum + (r.type === '7-11' ? FEE_711 : FEE_FAMILY), 0);
-      const sNetProfit = sRevenue - sTotalCost;
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-      const fMarket = marketRecords.filter(r => Number(r.year) === year && Number(r.month) === month);
-      const mTotalPerformance = fMarket.reduce((sum, r) => sum + r.performance, 0);
-      const mRevenue = mTotalPerformance * REVENUE_RATE;
-      const mRent = fMarket.reduce((sum, r) => sum + r.rent, 0);
-      const mClean = fMarket.reduce((sum, r) => sum + r.cleaning, 0);
-      const mElec = fMarket.reduce((sum, r) => sum + r.electricity, 0);
-      const mPark = fMarket.reduce((sum, r) => sum + r.parking, 0);
-      const mGas = fMarket.reduce((sum, r) => sum + r.gas, 0);
-      const mTotalExpenses = mRent + mClean + mElec + mPark + mGas;
-      const mNetProfit = mRevenue - mTotalExpenses;
+    const INPUT_STYLE = "p-3 border border-gray-200 rounded-xl outline-none focus:border-[#C3A995] text-gray-800 text-sm w-full";
+    const getToday = () => new Date().toLocaleDateString('en-CA');
+    const genId = () => Math.random().toString(36).substr(2, 9);
+    
+    const formatShortDate = (dateStr) => {
+      if (!dateStr) return '';
+      return dateStr.substring(5);
+    };
 
-      return { sCount, sTotalAmount, sRevenue, sTotalCost, sNetProfit, mTotalPerformance, mRevenue, mRent, mClean, mElec, mPark, mGas, mTotalExpenses, mNetProfit, fShipping, fMarket };
-    }
+    // ==========================================
+    // 1. 超商寄件分頁 (StoreTab) - 垂直一頁式
+    // ==========================================
+    function StoreTab({ records, setRecords, setEditingStore, showToast }) {
+      const [form, setForm] = useState({ date: getToday(), name: '', amount: '', storeType: '7-11', isFreeShipping: false });
 
-    function updateUI() {
-      const main = document.getElementById('main-content');
-      const data = calculateData(currentYear, currentMonth);
-      
-      document.getElementById('tab-conv').className = `tab-btn ${activeTab==='convenience'?'active':''}`;
-      document.getElementById('tab-market').className = `tab-btn ${activeTab==='market'?'active':''}`;
-      document.getElementById('tab-stats').className = `tab-btn ${activeTab==='analytics'?'active':''}`;
-      document.getElementById('tab-report').className = `tab-btn ${activeTab==='report'?'active':''}`;
-      
-      if (activeTab === 'convenience') {
-        main.innerHTML = `
-          <div class="card">
-            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📦 超商當月營運概況 (${currentMonth}月)</h3>
-            <div class="grid">
-              <div class="grid-item">當月寄件數<strong>${data.sCount} 件</strong></div>
-              <div class="grid-item">當月訂單金額<strong>$${data.sTotalAmount}</strong></div>
-              <div class="grid-item">當月收入(x0.35)<strong>$${data.sRevenue.toFixed(0)}</strong></div>
-              <div class="grid-item">運費支付總額<strong style="color:red;">$${data.sTotalCost}</strong></div>
-            </div>
-            <div class="total-banner"><span>📦 當月超商實賺：</span><span style="font-size:16px;">$${data.sNetProfit.toFixed(0)}</span></div>
-          </div>
-          <div class="card">
-            <h4 style="margin:0 0 8px 0; font-size:12px; color:#8D4B38;">➕ 新增每日超商寄件紀錄</h4>
-            <div class="form-group">
-              <input type="text" id="s-name" placeholder="訂購人姓名">
-              <input type="number" id="s-amount" placeholder="訂單金額">
-              <select id="s-type"><option value="7-11">7-11 (運費$38)</option><option value="全家">全家 (運費$39)</option></select>
-              <select id="s-isFree"><option value="false">免運：否</option><option value="true">免運：是</option></select>
-            </div>
-            <button class="save-btn" onclick="saveShipping()">儲存今日紀錄</button>
-          </div>
-          <div style="padding:0 12px; font-size:11px; font-weight:bold; color:gray;">當月明細回看</div>
-          ${data.fShipping.map(r => `
-            <div class="list-item">
-              <div><span style="font-weight:bold;">${r.name}</span> <span style="font-size:10px; background:#eee; padding:1px 4px; border-radius:3px;">${r.type}</span>${r.isFree?' <span style="font-size:10px; background:#FCE8E6; color:#A80000; padding:1px 4px; border-radius:3px;">免運</span>':''}</div>
-              <div style="font-weight:bold;">$${r.amount}</div>
-            </div>
-          `).join('')}
-        `;
-      }
-      
-      if (activeTab === 'market') {
-        main.innerHTML = `
-          <div class="card">
-            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">🎪 市場當月營運概況 (${currentMonth}月)</h3>
-            <div class="grid">
-              <div class="grid-item">當月營業業績<strong>$${data.mTotalPerformance}</strong></div>
-              <div class="grid-item">房屋位租總額<strong>$${data.mRent}</strong></div>
-              <div class="grid-item" style="grid-column: span 2">當月收入(x0.35)<strong>$${data.mRevenue.toFixed(0)}</strong></div>
-            </div>
-            <div class="total-banner market"><span>🎪 當月市場實賺：</span><span style="font-size:16px;">$${data.mNetProfit.toFixed(0)}</span></div>
-          </div>
-          <div class="card">
-            <h4 style="margin:0 0 8px 0; font-size:12px; color:#4A3E3D;">➕ 新增每日市場營業紀錄</h4>
-            <div class="form-group">
-              <input type="text" id="m-loc" placeholder="市場地點">
-              <input type="number" id="m-perf" placeholder="營業額業績">
-              <input type="number" id="m-rent" placeholder="當日位租">
-              <input type="number" id="m-gas" placeholder="加油錢">
-              <input type="number" id="m-clean" placeholder="清潔費">
-              <input type="number" id="m-elec" placeholder="電費">
-              <input type="number" id="m-park" placeholder="停車費">
-              <input type="text" id="m-note" placeholder="其他支出備註" style="grid-column: span 2">
-            </div>
-            <button class="save-btn" style="background:#4A3E3D;" onclick="saveMarket()">儲存今日市場紀錄</button>
-          </div>
-          <div style="padding:0 12px; font-size:11px; font-weight:bold; color:gray;">當月市場明細</div>
-          ${data.fMarket.map(r => `
-            <div class="list-item market">
-              <div>
-                <div style="font-weight:bold;">📍 ${r.location}</div>
-                <div style="font-size:10px; color:gray; margin-top:2px;">位租:$${r.rent} | 油:$${r.gas} | 清:$${r.cleaning} | 電/停:$${r.electricity+r.parking}</div>
+      const addRec = () => {
+        if (!form.name || !form.amount) return showToast('⚠️ 姓名與金額必填');
+        const fee = form.storeType === '7-11' ? 38 : 39;
+        setRecords(p => [{ id: genId(), ...form, shippingFee: fee, status: 'pending' }, ...p]);
+        setForm({ ...form, name: '', amount: '' });
+        showToast('✅ 已新增未寄出訂單');
+      };
+
+      const toggleStatus = (id) => {
+        setRecords(p => p.map(r => {
+          if (r.id === id) {
+            const currentStatus = r.status || 'pending';
+            return { ...r, status: currentStatus === 'pending' ? 'shipped' : 'pending' };
+          }
+          return r;
+        }));
+      };
+
+      const pendingList = records.filter(r => (r.status || 'pending') === 'pending');
+      const shippedList = records.filter(r => r.status === 'shipped');
+
+      return (
+        <div className="animate-fade-in space-y-6">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
+            <h2 className="text-[#5C4D42] font-bold mb-3">📦 新增寄件</h2>
+            <div className="space-y-3">
+              <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
+              <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
+              <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
+              <div className="grid grid-cols-2 gap-3">
+                <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
+                  <option value="7-11">7-11 (運費$38)</option>
+                  <option value="全家">全家 (運費$39)</option>
+                </select>
+                <select value={form.isFreeShipping} onChange={e=>setForm({...form, isFreeShipping:e.target.value === 'true'})} className={INPUT_STYLE}>
+                  <option value={false}>運費：買家付</option>
+                  <option value={true}>運費：免運</option>
+                </select>
               </div>
-              <div style="font-weight:bold; color:green;">+$${r.performance}</div>
+              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">新增寄件</button>
             </div>
-          `).join('')}
-        `;
-      }
-      
-      if (activeTab === 'analytics') {
-        const totalRev = data.mRevenue || 1;
-        const rentP = ((data.mRent / totalRev) * 100).toFixed(0);
-        const restExpenses = data.mTotalExpenses - data.mRent;
-        const expP = ((restExpenses / totalRev) * 100).toFixed(0);
-        const netP = (100 - Number(rentP) - Number(expP));
+          </div>
 
-        main.innerHTML = `
-          <div class="card">
-            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📊 雙軌實賺獨立結算</h3>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:8px 0; border-bottom:1px solid #eee;"><span>📦 超商管道實賺：</span><span style="font-weight:bold; color:#8D4B38; font-size:14px;">$${data.sNetProfit.toFixed(0)}</span></div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:8px 0;"><span>🎪 市場攤位實賺：</span><span style="font-weight:bold; color:#4A3E3D; font-size:14px;">$${data.mNetProfit.toFixed(0)}</span></div>
-          </div>
-          <div class="card">
-            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📌 市場完整成本佔比分析報告</h3>
-            <div style="background:#eee; height:16px; border-radius:8px; overflow:hidden; display:flex; font-size:9px; color:white; text-align:center; font-weight:bold;">
-              <div style="background:#A78B71; width: ${data.mRevenue > 0 ? netP : 65}%;">實賺 ${data.mRevenue > 0 ? netP : 65}%</div>
-              <div style="background:#8D4B38; width: ${data.mRevenue > 0 ? rentP : 20}%;">位租 ${data.mRevenue > 0 ? rentP : 20}%</div>
-              <div style="background:#d97706; width: ${data.mRevenue > 0 ? expP : 15}%;">雜支 ${data.mRevenue > 0 ? expP : 15}%</div>
-            </div>
-            <div style="font-size:12px; margin-top:10px; color:#555; line-height:1.6;">
-              <strong>當月市場總收入：$${data.mRevenue.toFixed(0)}</strong><br>
-              • 房屋位租：$${data.mRent} | • 加油錢：$${data.mGas}<br>
-              • 清潔費：$${data.mClean} | • 電費：$${data.mElectricity}<br>
-              • 停車費：$${data.mPark}<br>
-              <span style="color:red; font-weight:bold;">當月總支出：-$${data.mTotalExpenses}</span>
-            </div>
-          </div>
-          <button class="save-btn" style="background:#fee2e2; color:#dc2626; margin:12px; width:calc(100% - 24px);" onclick="if(confirm('確定要清空數據重來嗎？')){localStorage.clear();location.reload();}">⚠️ 清除手機內所有記帳資料</button>
-        `;
-      }
-      
-      if (activeTab === 'report') {
-        const pM = currentMonth === 1 ? 12 : currentMonth - 1;
-        const pY = currentMonth === 1 ? currentYear - 1 : currentYear;
-        const pData = calculateData(pY, pM);
-        const sG = pData.sNetProfit === 0 ? 0 : ((data.sNetProfit - pData.sNetProfit) / Math.abs(pData.sNetProfit) * 100);
-        const mG = pData.mNetProfit === 0 ? 0 : ((data.mNetProfit - pData.mNetProfit) / Math.abs(pData.mNetProfit) * 100);
-        main.innerHTML = `
-          <div class="card">
-            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📅 1-12月份 獨立營收成長率報告</h3>
-            <div style="font-size:12px; line-height:1.8;">
-              <span style="font-weight:bold; color:#8D4B38;">${currentYear}年 ${currentMonth}月 本月結算：</span><br>
-              • 超商實賺：$${data.sNetProfit.toFixed(0)} <strong style="color:${sG>=0?'green':'red'}">比上月 ${sG>=0?'+':''}${sG.toFixed(1)}%</strong><br>
-              • 市場實賺：$${data.mNetProfit.toFixed(0)} <strong style="color:${mG>=0?'green':'red'}">比上月 ${mG>=0?'+':''}${mG.toFixed(1)}%</strong>
+          <div>
+            <h3 className="text-[#5C4D42] font-bold mb-3 flex items-center gap-2">📌 未寄出 <span className="bg-[#C3A995] text-white text-xs px-2 py-1 rounded-full">{pendingList.length}</span></h3>
+            <div className="space-y-2">
+              {pendingList.map(r => (
+                <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-400 flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-[#5C4D42] flex items-center gap-1">⭐️ {r.name}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formatShortDate(r.date)} | {r.storeType} | <span className="font-bold text-gray-700">${r.amount}</span>
+                      {r.isFreeShipping && <span className="ml-2 text-red-500 bg-red-50 px-1 rounded">免運</span>}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 items-end">
+                    <button onClick={()=>toggleStatus(r.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-full font-bold shadow-sm">
+                      確認寄出
+                    </button>
+                    <div className="flex gap-3 mt-1">
+                      <button onClick={()=>setEditingStore(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                      <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-gray-400 font-bold">刪除</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {pendingList.length === 0 && <div className="text-center text-gray-400 text-sm py-2">太棒了，目前沒有未寄出清單！</div>}
             </div>
           </div>
-        `;
-      }
+
+          <div>
+            <h3 className="text-gray-400 font-bold mb-3">✅ 已寄出</h3>
+            <div className="space-y-2 opacity-80">
+              {shippedList.map(r => (
+                <div key={r.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <div className="font-bold text-gray-500 flex items-center gap-1">⭐️ {r.name}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {formatShortDate(r.date)} | {r.storeType} | ${r.amount}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 items-end">
+                    <button onClick={()=>toggleStatus(r.id)} className="text-xs bg-gray-200 text-gray-500 px-3 py-1 rounded-full font-bold">
+                      復原為未寄出
+                    </button>
+                    <div className="flex gap-3 mt-1">
+                      <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {shippedList.length === 0 && <div className="text-center text-gray-400 text-sm py-2">尚無紀錄</div>}
+            </div>
+          </div>
+        </div>
+      );
     }
 
-    window.saveShipping = function() {
-      const name = document.getElementById('s-name').value;
-      const amount = Number(document.getElementById('s-amount').value);
-      const type = document.getElementById('s-type').value;
-      const isFree = document.getElementById('s-isFree').value === 'true';
-      if(!name || !amount) return alert('姓名金額都要填唷');
-      shippingRecords.push({ year: currentYear, month: currentMonth, name, amount, type, isFree });
-      saveData(); updateUI();
-    };
+    // ==========================================
+    // 2. 市場營業分頁 (MarketTab)
+    // ==========================================
+    function MarketTab({ records, setRecords, setEditingMarket, showToast }) {
+      const [form, setForm] = useState({ date: getToday(), location: '', perf: '', rent: '', note: '' });
 
-    window.saveMarket = function() {
-      const location = document.getElementById('m-loc').value;
-      const performance = Number(document.getElementById('m-perf').value);
-      const rent = Number(document.getElementById('m-rent').value);
-      const gas = Number(document.getElementById('m-gas').value) || 0;
-      const cleaning = Number(document.getElementById('m-clean').value) || 0;
-      const electricity = Number(document.getElementById('m-elec').value) || 0;
-      const parking = Number(document.getElementById('m-park').value) || 0;
-      const note = document.getElementById('m-note').value;
-      if(!location || !performance || !rent) return alert('地點、業績和位租都要填唷');
-      marketRecords.push({ year: currentYear, month: currentMonth, location, performance, rent, gas, cleaning, electricity, parking, note });
-      saveData(); updateUI();
-    };
+      const addRec = () => {
+        if (!form.location || !form.perf || !form.rent) return showToast('⚠️ 地點、業績與位租必填');
+        setRecords(p => [{ id: genId(), ...form }, ...p]);
+        setForm({ ...form, location: '', perf: '', rent: '', note: '' });
+        showToast('✅ 已新增市場紀錄');
+      };
 
-    document.getElementById('select-year').addEventListener('change', (e) => { currentYear = Number(e.target.value); updateUI(); });
-    document.getElementById('select-month').addEventListener('change', (e) => { currentMonth = Number(e.target.value); updateUI(); });
-    document.getElementById('tab-conv').addEventListener('click', () => { activeTab = 'convenience'; updateUI(); });
-    document.getElementById('tab-market').addEventListener('click', () => { activeTab = 'market'; updateUI(); });
-    document.getElementById('tab-stats').addEventListener('click', () => { activeTab = 'analytics'; updateUI(); });
-    document.getElementById('tab-report').addEventListener('click', () => { activeTab = 'report'; updateUI(); });
-    
-    updateUI();
+      return (
+        <div className="animate-fade-in space-y-4">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
+            <h2 className="text-[#5C4D42] font-bold mb-3">🛒 新增市場營業</h2>
+            <div className="space-y-3">
+              <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" placeholder="地點" value={form.location} onChange={e=>setForm({...form, location:e.target.value})} className={INPUT_STYLE} />
+                <input type="number" placeholder="當日業績" value={form.perf} onChange={e=>setForm({...form, perf:e.target.value})} className={INPUT_STYLE} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" placeholder="位租" value={form.rent} onChange={e=>setForm({...form, rent:e.target.value})} className={INPUT_STYLE} />
+                <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
+              </div>
+              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存紀錄</button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {records.map(r => (
+              <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-gray-400">
+                <div className="flex justify-between">
+                  <div className="font-bold text-[#5C4D42]">📍 {r.location} <span className="text-xs text-gray-400">({formatShortDate(r.date)})</span></div>
+                  <div className="font-bold text-green-600">+${r.perf}</div>
+                </div>
+                <div className="text-xs text-gray-500 mt-2 flex justify-between">
+                  <span>租金: ${r.rent} {r.note ? `| 備註: ${r.note}` : ''}</span>
+                </div>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button onClick={()=>setEditingMarket(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                  <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 3. 報表分頁 (ReportTab)
+    // ==========================================
+    function ReportTab({ storeRecords, marketRecords }) {
+      const [month, setMonth] = useState(new Date().getMonth() + 1);
+      const [year, setYear] = useState(new Date().getFullYear());
+
+      const sData = storeRecords.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+      const mData = marketRecords.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+
+      const sCount = sData.length;
+      const sTotalAmt = sData.reduce((acc, r) => acc + Number(r.amount||0), 0);
+      const sRev = sTotalAmt * 0.35;
+      const sCost = sData.reduce((acc, r) => acc + Number(r.shippingFee||0), 0);
+      const sNet = sRev - sCost;
+
+      const mPerf = mData.reduce((acc, r) => acc + Number(r.perf||0), 0);
+      const mRev = mPerf * 0.35;
+      const mRent = mData.reduce((acc, r) => acc + Number(r.rent||0), 0);
+      const mNet = mRev - mRent;
+
+      return (
+        <div className="animate-fade-in space-y-5">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA] flex gap-3">
+            <select value={year} onChange={e=>setYear(Number(e.target.value))} className={INPUT_STYLE}>
+              <option value="2024">2024年</option><option value="2025">2025年</option><option value="2026">2026年</option>
+            </select>
+            <select value={month} onChange={e=>setMonth(Number(e.target.value))} className={INPUT_STYLE}>
+              {Array.from({length:12}, (_, i) => <option key={i+1} value={i+1}>{i+1}月</option>)}
+            </select>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between items-end">
+              <span>📦 超商結算 <span className="text-xs text-gray-400 font-normal">(僅計已出貨)</span></span>
+              <span className="text-[#C3A995]">實賺 ${sNet.toFixed(0)}</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>寄件數</span><strong className="text-black">{sCount} 件</strong></div>
+              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總金額</span><strong className="text-black">${sTotalAmt}</strong></div>
+              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總運費</span><strong className="text-red-500">${sCost}</strong></div>
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between">
+              <span>🛒 市場結算</span>
+              <span className="text-[#5C4D42]">實賺 ${mNet.toFixed(0)}</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總業績</span><strong className="text-black">${mPerf}</strong></div>
+              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總位租</span><strong className="text-red-500">${mRent}</strong></div>
+            </div>
+          </div>
+          
+          <div className="bg-[#C3A995] text-white p-5 rounded-2xl shadow-sm font-bold flex justify-between items-center text-lg">
+            <span>{month}月 總淨利</span>
+            <span className="text-2xl">${(sNet + mNet).toFixed(0)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 4. 留貨單待辦分頁 (ReserveTab)
+    // ==========================================
+    function ReserveTab({ records, setRecords, onCheckBoxClick, setEditingReserve, showToast }) {
+      const [form, setForm] = useState({ date: getToday(), name: '', quantity: '', note: '' });
+      const [checkedId, setCheckedId] = useState(null);
+
+      const addRec = () => {
+        if (!form.name || !form.quantity) return showToast('⚠️ 姓名與件數必填');
+        setRecords(p => [{ id: genId(), ...form }, ...p]);
+        setForm({ ...form, name: '', quantity: '', note: '' });
+        showToast('✅ 已加入清單');
+      };
+
+      const handleCheck = (r) => {
+        setCheckedId(r.id); 
+        setTimeout(() => {
+          setCheckedId(null);
+          onCheckBoxClick(r); 
+        }, 300);
+      };
+
+      return (
+        <div className="animate-fade-in space-y-4">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
+            <h2 className="text-[#5C4D42] font-bold mb-3">💎 新增留貨清單</h2>
+            <div className="space-y-3">
+              <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
+              <input type="text" placeholder="訂購人姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" placeholder="件數" value={form.quantity} onChange={e=>setForm({...form, quantity:e.target.value})} className={INPUT_STYLE} />
+                <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
+              </div>
+              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">加入清單</button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {records.map(r => (
+              <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+                <div onClick={() => handleCheck(r)} 
+                     className="w-6 h-6 border-2 border-[#5C4D42] bg-white rounded flex items-center justify-center cursor-pointer shrink-0 transition-all">
+                  {checkedId === r.id && <span className="text-[#5C4D42] font-bold text-lg leading-none select-none">✓</span>}
+                </div>
+                
+                <div className="flex-1">
+                  <div className="font-bold text-[#5C4D42]">{r.name}</div>
+                  <div className="text-xs text-gray-500 mt-1">數量: {r.quantity}件 {r.note ? `| 備註: ${r.note}` : ''} <br/> {formatShortDate(r.date)}</div>
+                </div>
+                <div className="flex flex-col gap-2 items-end">
+                  <button onClick={()=>setEditingReserve(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                  <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                </div>
+              </div>
+            ))}
+            {records.length === 0 && <div className="text-center text-gray-400 text-sm py-4">目前沒有留貨清單！</div>}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 主程式 (App)
+    // ==========================================
+    function App() {
+      const [activeTab, setActiveTab] = useState('store');
+      const [showSettings, setShowSettings] = useState(false);
+      const [toast, setToast] = useState('');
+
+      const [storeRecords, setStoreRecords] = useState(() => JSON.parse(localStorage.getItem('xq_store') || '[]'));
+      const [marketRecords, setMarketRecords] = useState(() => JSON.parse(localStorage.getItem('xq_market') || '[]'));
+      const [reserveRecords, setReserveRecords] = useState(() => JSON.parse(localStorage.getItem('xq_reserve') || '[]'));
+
+      const [editingStore, setEditingStore] = useState(null);
+      const [editingMarket, setEditingMarket] = useState(null);
+      const [editingReserve, setEditingReserve] = useState(null);
+      const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11' });
+
+      useEffect(() => localStorage.setItem('xq_store', JSON.stringify(storeRecords)), [storeRecords]);
+      useEffect(() => localStorage.setItem('xq_market', JSON.stringify(marketRecords)), [marketRecords]);
+      useEffect(() => localStorage.setItem('xq_reserve', JSON.stringify(reserveRecords)), [reserveRecords]);
+
+      const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
+
+      const exportData = () => {
+        const blob = new Blob([JSON.stringify({ storeRecords, marketRecords, reserveRecords })], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `向錢衝備份_${getToday()}.json`;
+        a.click();
+        setShowSettings(false);
+      };
+
+      const importData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+            if (data.storeRecords) setStoreRecords(data.storeRecords);
+            if (data.marketRecords) setMarketRecords(data.marketRecords);
+            if (data.reserveRecords) setReserveRecords(data.reserveRecords);
+            showToast('✅ 資料還原成功');
+            setShowSettings(false);
+          } catch(err) { alert('檔案格式錯誤'); }
+        };
+        reader.readAsText(file);
+      };
+
+      // 連動：直接建立「未寄出」訂單並跳轉，不預填表單
+      const confirmTransfer = () => {
+        const { record, storeType } = transferModal;
+        const autoAmount = Number(record.quantity) * 200;
+        const fee = storeType === '7-11' ? 38 : 39;
+        
+        const newRec = {
+          id: genId(), date: getToday(), name: record.name, amount: autoAmount,
+          storeType, isFreeShipping: false, shippingFee: fee, status: 'pending' // 狀態直接設定為待寄出
+        };
+        
+        setStoreRecords(p => [newRec, ...p]);
+        setReserveRecords(p => p.filter(r => r.id !== record.id));
+        setTransferModal({ isOpen: false, record: null, storeType: '7-11' });
+        
+        setActiveTab('store');
+        showToast(`✅ 已轉入未寄出清單`);
+      };
+
+      return (
+        <div className="min-h-screen pb-safe">
+          {toast && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-gray-800 text-white px-5 py-2 rounded-full shadow-lg text-sm font-bold w-max max-w-[90vw] text-center animate-fade-in">{toast}</div>}
+
+          <header className="bg-[#C3A995] text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
+            <h1 className="text-xl font-bold tracking-wider">💰 向錢衝</h1>
+            <button onClick={() => setShowSettings(true)} className="text-xl hover:opacity-80">⚙️</button>
+          </header>
+
+          {showSettings && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="font-bold text-[#5C4D42]">系統設定</h3>
+                  <button onClick={() => setShowSettings(false)} className="text-gray-400 font-bold">✖</button>
+                </div>
+                <div className="space-y-3">
+                  <button onClick={exportData} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">📤 匯出備份 (JSON)</button>
+                  <label className="block w-full border-2 border-[#C3A995] text-[#C3A995] text-center py-3 rounded-xl font-bold cursor-pointer">
+                    📥 匯入資料 (換手機用)
+                    <input type="file" accept=".json" onChange={importData} className="hidden" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {transferModal.isOpen && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                <h3 className="font-bold text-[#5C4D42] mb-3">🔄 轉入超商未寄出</h3>
+                <div className="text-sm text-gray-500 mb-4 bg-gray-50 p-3 rounded-xl leading-relaxed">
+                  將自動帶入訂購人：<strong className="text-black">{transferModal.record.name}</strong><br/>
+                  系統自動換算金額：數量 {transferModal.record.quantity} × 200 = <strong className="text-black">${transferModal.record.quantity * 200}</strong>
+                </div>
+                <p className="text-xs font-bold text-gray-500 mb-2">請選擇寄件超商：</p>
+                <select value={transferModal.storeType} onChange={e=>setTransferModal({...transferModal, storeType: e.target.value})} className={INPUT_STYLE + " mb-4"}>
+                  <option value="7-11">7-11 (運費$38)</option>
+                  <option value="全家">全家 (運費$39)</option>
+                </select>
+                <div className="flex gap-3">
+                  <button onClick={()=>setTransferModal({isOpen:false})} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
+                  <button onClick={confirmTransfer} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold shadow-md">轉入清單</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingStore && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                <h3 className="font-bold text-[#5C4D42] mb-3">✏️ 編輯寄件單</h3>
+                <div className="space-y-3">
+                  <input type="date" value={editingStore.date} onChange={e=>setEditingStore({...editingStore, date:e.target.value})} className={INPUT_STYLE}/>
+                  <input type="text" value={editingStore.name} onChange={e=>setEditingStore({...editingStore, name:e.target.value})} className={INPUT_STYLE}/>
+                  <input type="number" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:e.target.value})} className={INPUT_STYLE}/>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={()=>setEditingStore(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button onClick={()=>{setStoreRecords(p=>p.map(r=>r.id===editingStore.id ? editingStore : r)); setEditingStore(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingMarket && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                <h3 className="font-bold text-[#5C4D42] mb-3">✏️ 編輯市場紀錄</h3>
+                <div className="space-y-3">
+                  <input type="date" value={editingMarket.date} onChange={e=>setEditingMarket({...editingMarket, date:e.target.value})} className={INPUT_STYLE}/>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" placeholder="地點" value={editingMarket.location} onChange={e=>setEditingMarket({...editingMarket, location:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="業績" value={editingMarket.perf} onChange={e=>setEditingMarket({...editingMarket, perf:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="text" placeholder="備註" value={editingMarket.note} onChange={e=>setEditingMarket({...editingMarket, note:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={()=>setEditingMarket(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button onClick={()=>{setMarketRecords(p=>p.map(r=>r.id===editingMarket.id ? editingMarket : r)); setEditingMarket(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {editingReserve && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+                <h3 className="font-bold text-[#5C4D42] mb-3">✏️ 編輯留貨單</h3>
+                <div className="space-y-3">
+                  <input type="date" value={editingReserve.date} onChange={e=>setEditingReserve({...editingReserve, date:e.target.value})} className={INPUT_STYLE}/>
+                  <input type="text" value={editingReserve.name} placeholder="姓名" onChange={e=>setEditingReserve({...editingReserve, name:e.target.value})} className={INPUT_STYLE}/>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="件數" value={editingReserve.quantity} onChange={e=>setEditingReserve({...editingReserve, quantity:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="text" placeholder="備註" value={editingReserve.note} onChange={e=>setEditingReserve({...editingReserve, note:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={()=>setEditingReserve(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button onClick={()=>{setReserveRecords(p=>p.map(r=>r.id===editingReserve.id ? editingReserve : r)); setEditingReserve(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <main className="p-4 max-w-md mx-auto">
+            {activeTab === 'store' && <StoreTab records={storeRecords} setRecords={setStoreRecords} setEditingStore={setEditingStore} showToast={showToast} />}
+            {activeTab === 'market' && <MarketTab records={marketRecords} setRecords={setMarketRecords} setEditingMarket={setEditingMarket} showToast={showToast} />}
+            {activeTab === 'reports' && <ReportTab storeRecords={storeRecords} marketRecords={marketRecords} />}
+            {activeTab === 'reserve' && <ReserveTab records={reserveRecords} setRecords={setReserveRecords} setEditingReserve={setEditingReserve} showToast={showToast} onCheckBoxClick={(r) => setTransferModal({ isOpen: true, record: r, storeType: '7-11' })} />}
+          </main>
+
+          <nav className="fixed bottom-0 w-full bg-white border-t flex justify-around shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-40 pb-[env(safe-area-inset-bottom)]">
+            <button onClick={() => setActiveTab('store')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'store' ? 'tab-active' : 'tab-inactive'}`}>🏪 超商</button>
+            <button onClick={() => setActiveTab('market')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'market' ? 'tab-active' : 'tab-inactive'}`}>🛒 市場</button>
+            <button onClick={() => setActiveTab('reports')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reports' ? 'tab-active' : 'tab-inactive'}`}>📊 報表</button>
+            <button onClick={() => setActiveTab('reserve')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reserve' ? 'tab-active' : 'tab-inactive'}`}>💎 留貨</button>
+          </nav>
+        </div>
+      );
+    }
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
+
+
+```
