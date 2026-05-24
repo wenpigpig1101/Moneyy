@@ -2,113 +2,246 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>💰 向錢衝</title>
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#C3A995">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>向錢衝 App</title>
   <style>
-    ::-webkit-scrollbar { display: none; }
-    body { 
-      -ms-overflow-style: none; scrollbar-width: none; 
-      background-color: #FDFBF7; color: #5C4D42; 
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-      -webkit-tap-highlight-color: transparent;
-    }
-    .pb-safe { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-    input[type="date"] { -webkit-appearance: none; min-height: 3rem; }
+    body { background-color: #F8F1EC; color: #4A3E3D; font-family: -apple-system, sans-serif; margin: 0; padding-bottom: 50px; }
+    header { background-color: #D0B8A8; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 50; }
+    .tabs { display: flex; background: white; border-bottom: 1px solid #E6DDD7; position: sticky; top: 52px; z-index: 40; }
+    .tab-btn { flex: 1; padding: 12px 0; text-align: center; font-size: 13px; font-weight: bold; border: none; background: none; color: #A0A0A0; border-bottom: 2px solid transparent; cursor: pointer; }
+    .tab-btn.active { color: #8D4B38; border-bottom-color: #8D4B38; background-color: #FDFBF7; }
+    .card { background: white; padding: 16px; margin: 12px; border: 1px solid #E6DDD7; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; margin: 8px 0; }
+    .grid-item { background: #FDFBF7; padding: 8px; border: 1px solid #E6DDD7; border-radius: 6px; font-size: 12px; }
+    .grid-item strong { display: block; font-size: 14px; margin-top: 2px; }
+    .total-banner { background: #8D4B38; color: white; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: bold; margin-top: 8px; }
+    .total-banner.market { background: #4A3E3D; }
+    .form-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    input, select { padding: 8px; border: 1px solid #E6DDD7; border-radius: 6px; background: #FDFBF7; color: #4A3E3D; font-size: 12px; width: 100%; box-sizing: border-box; }
+    button.save-btn { width: 100%; background: #D0B8A8; color: white; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; margin-top: 8px; cursor: pointer; }
+    .list-item { background: white; padding: 12px; margin: 6px 12px; border-radius: 8px; border-left: 4px solid #D0B8A8; display: flex; justify-content: space-between; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .list-item.market { border-left-color: #4A3E3D; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="app">
+    <header>
+      <h1 style="margin:0; font-size:18px; tracking-wider">💰 向錢衝</h1>
+      <div>
+        <select id="select-year" style="width:auto; padding:2px; font-size:11px; background:white;">
+          <option value="2026" selected>2026年</option>
+          <option value="2025">2025年</option>
+        </select>
+        <select id="select-month" style="width:auto; padding:2px; font-size:11px; background:white;"></select>
+      </div>
+    </header>
+    <div class="tabs">
+      <button id="tab-conv" class="tab-btn active">📦 超商寄件</button>
+      <button id="tab-market" class="tab-btn">🎪 每日市場</button>
+      <button id="tab-stats" class="tab-btn">📊 營收統計</button>
+      <button id="tab-report" class="tab-btn">📅 对比報告</button>
+    </div>
+    <main id="main-content" style="max-width:400px; margin:0 auto;"></main>
+  </div>
 
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-    const THEME = { primary: '#C3A995', secondary: '#E3D5CA', bg: '#FDFBF7', textMain: '#5C4D42' };
+  <script>
+    const FEE_711 = 38, FEE_FAMILY = 39, REVENUE_RATE = 0.35;
+    let currentYear = 2026, currentMonth = 5, activeTab = 'convenience';
+    
+    let shippingRecords = JSON.parse(localStorage.getItem('shippingRecords')) || [];
+    let marketRecords = JSON.parse(localStorage.getItem('marketRecords')) || [];
+    
+    function saveData() { 
+      localStorage.setItem('shippingRecords', JSON.stringify(shippingRecords)); 
+      localStorage.setItem('marketRecords', JSON.stringify(marketRecords)); 
+    }
+    
+    document.getElementById('select-month').innerHTML = Array.from({length:12},(_, i)=>`<option value="${i+1}" ${i+1===currentMonth?'selected':''}>${i+1}月</option>`).join('');
+    
+    function calculateData(year, month) {
+      const fShipping = shippingRecords.filter(r => Number(r.year) === year && Number(r.month) === month);
+      const sCount = fShipping.length;
+      const sTotalAmount = fShipping.reduce((sum, r) => sum + r.amount, 0);
+      const sRevenue = sTotalAmount * REVENUE_RATE;
+      const sTotalCost = fShipping.reduce((sum, r) => sum + (r.type === '7-11' ? FEE_711 : FEE_FAMILY), 0);
+      const sNetProfit = sRevenue - sTotalCost;
 
-    // 佔位組件 (請將您原本的組件實作填入這裡)
-    const StoreManager = () => <div className="p-4">超商管理頁面</div>;
-    const MarketManager = () => <div className="p-4">市集管理頁面</div>;
-    const ReportDashboard = () => <div className="p-4">報表頁面</div>;
-    const ReserveManager = () => <div className="p-4">預留管理頁面</div>;
+      const fMarket = marketRecords.filter(r => Number(r.year) === year && Number(r.month) === month);
+      const mTotalPerformance = fMarket.reduce((sum, r) => sum + r.performance, 0);
+      const mRevenue = mTotalPerformance * REVENUE_RATE;
+      const mRent = fMarket.reduce((sum, r) => sum + r.rent, 0);
+      const mClean = fMarket.reduce((sum, r) => sum + r.cleaning, 0);
+      const mElec = fMarket.reduce((sum, r) => sum + r.electricity, 0);
+      const mPark = fMarket.reduce((sum, r) => sum + r.parking, 0);
+      const mGas = fMarket.reduce((sum, r) => sum + r.gas, 0);
+      const mTotalExpenses = mRent + mClean + mElec + mPark + mGas;
+      const mNetProfit = mRevenue - mTotalExpenses;
 
-    function App() {
-      const [activeTab, setActiveTab] = useState('store');
-      const [toastMsg, setToastMsg] = useState('');
-      const [showSettings, setShowSettings] = useState(false);
-      const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', confirmText: '確定', isDanger: false, showStoreSelect: false, onConfirm: null });
-      const [modalStoreType, setModalStoreType] = useState('7-11'); 
-
-      const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
-      
-      const showModal = (config) => {
-        setModalStoreType('7-11');
-        setModalConfig({ ...config, isOpen: true });
-      };
-
-      return (
-        <div className="min-h-screen relative pb-safe">
-          {toastMsg && (
-            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-fade-in bg-gray-800 text-white px-5 py-3 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 whitespace-nowrap">
-              {toastMsg}
-            </div>
-          )}
-
-          {modalConfig.isOpen && (
-            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[110] p-4 animate-fade-in">
-              <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl">
-                <h3 className="text-xl font-bold mb-3 text-[#5C4D42]">{modalConfig.title}</h3>
-                <p className="text-gray-600 mb-4">{modalConfig.message}</p>
-                <div className="flex gap-3 justify-end">
-                  <button onClick={() => setModalConfig(p => ({...p, isOpen: false}))} className="px-5 py-3 bg-gray-100 rounded-xl">取消</button>
-                  <button onClick={modalConfig.onConfirm} className="px-5 py-3 bg-[#C3A995] text-white rounded-xl">確定</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <header className="text-white shadow-md p-4 sticky top-0 z-50 bg-[#C3A995]">
-            <div className="max-w-4xl mx-auto flex justify-between items-center">
-              <h1 className="text-2xl font-bold">💰 向錢衝</h1>
-              <button onClick={() => setShowSettings(true)}>⚙️</button>
-            </div>
-          </header>
-
-          <main className="max-w-4xl mx-auto p-4">
-            {activeTab === 'store' && <StoreManager />}
-            {activeTab === 'market' && <MarketManager />}
-            {activeTab === 'reports' && <ReportDashboard />}
-            {activeTab === 'reserve' && <ReserveManager />}
-          </main>
-
-          <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-2 pb-safe flex justify-around z-[60]">
-            {[
-              { id: 'store', icon: '📦', label: '超商' },
-              { id: 'market', icon: '🛒', label: '市集' },
-              { id: 'reports', icon: '📊', label: '報表' },
-              { id: 'reserve', icon: '💎', label: '預留' }
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center p-2 ${activeTab === tab.id ? 'text-[#C3A995]' : 'text-gray-400'}`}>
-                <span className="text-xl">{tab.icon}</span>
-                <span className="text-[10px] font-bold">{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-      );
+      return { sCount, sTotalAmount, sRevenue, sTotalCost, sNetProfit, mTotalPerformance, mRevenue, mRent, mClean, mElec, mPark, mGas, mTotalExpenses, mNetProfit, fShipping, fMarket };
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    function updateUI() {
+      const main = document.getElementById('main-content');
+      const data = calculateData(currentYear, currentMonth);
+      
+      document.getElementById('tab-conv').className = `tab-btn ${activeTab==='convenience'?'active':''}`;
+      document.getElementById('tab-market').className = `tab-btn ${activeTab==='market'?'active':''}`;
+      document.getElementById('tab-stats').className = `tab-btn ${activeTab==='analytics'?'active':''}`;
+      document.getElementById('tab-report').className = `tab-btn ${activeTab==='report'?'active':''}`;
+      
+      if (activeTab === 'convenience') {
+        main.innerHTML = `
+          <div class="card">
+            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📦 超商當月營運概況 (${currentMonth}月)</h3>
+            <div class="grid">
+              <div class="grid-item">當月寄件數<strong>${data.sCount} 件</strong></div>
+              <div class="grid-item">當月訂單金額<strong>$${data.sTotalAmount}</strong></div>
+              <div class="grid-item">當月收入(x0.35)<strong>$${data.sRevenue.toFixed(0)}</strong></div>
+              <div class="grid-item">運費支付總額<strong style="color:red;">$${data.sTotalCost}</strong></div>
+            </div>
+            <div class="total-banner"><span>📦 當月超商實賺：</span><span style="font-size:16px;">$${data.sNetProfit.toFixed(0)}</span></div>
+          </div>
+          <div class="card">
+            <h4 style="margin:0 0 8px 0; font-size:12px; color:#8D4B38;">➕ 新增每日超商寄件紀錄</h4>
+            <div class="form-group">
+              <input type="text" id="s-name" placeholder="訂購人姓名">
+              <input type="number" id="s-amount" placeholder="訂單金額">
+              <select id="s-type"><option value="7-11">7-11 (運費$38)</option><option value="全家">全家 (運費$39)</option></select>
+              <select id="s-isFree"><option value="false">免運：否</option><option value="true">免運：是</option></select>
+            </div>
+            <button class="save-btn" onclick="saveShipping()">儲存今日紀錄</button>
+          </div>
+          <div style="padding:0 12px; font-size:11px; font-weight:bold; color:gray;">當月明細回看</div>
+          ${data.fShipping.map(r => `
+            <div class="list-item">
+              <div><span style="font-weight:bold;">${r.name}</span> <span style="font-size:10px; background:#eee; padding:1px 4px; border-radius:3px;">${r.type}</span>${r.isFree?' <span style="font-size:10px; background:#FCE8E6; color:#A80000; padding:1px 4px; border-radius:3px;">免運</span>':''}</div>
+              <div style="font-weight:bold;">$${r.amount}</div>
+            </div>
+          `).join('')}
+        `;
+      }
+      
+      if (activeTab === 'market') {
+        main.innerHTML = `
+          <div class="card">
+            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">🎪 市場當月營運概況 (${currentMonth}月)</h3>
+            <div class="grid">
+              <div class="grid-item">當月營業業績<strong>$${data.mTotalPerformance}</strong></div>
+              <div class="grid-item">房屋位租總額<strong>$${data.mRent}</strong></div>
+              <div class="grid-item" style="grid-column: span 2">當月收入(x0.35)<strong>$${data.mRevenue.toFixed(0)}</strong></div>
+            </div>
+            <div class="total-banner market"><span>🎪 當月市場實賺：</span><span style="font-size:16px;">$${data.mNetProfit.toFixed(0)}</span></div>
+          </div>
+          <div class="card">
+            <h4 style="margin:0 0 8px 0; font-size:12px; color:#4A3E3D;">➕ 新增每日市場營業紀錄</h4>
+            <div class="form-group">
+              <input type="text" id="m-loc" placeholder="市場地點">
+              <input type="number" id="m-perf" placeholder="營業額業績">
+              <input type="number" id="m-rent" placeholder="當日位租">
+              <input type="number" id="m-gas" placeholder="加油錢">
+              <input type="number" id="m-clean" placeholder="清潔費">
+              <input type="number" id="m-elec" placeholder="電費">
+              <input type="number" id="m-park" placeholder="停車費">
+              <input type="text" id="m-note" placeholder="其他支出備註" style="grid-column: span 2">
+            </div>
+            <button class="save-btn" style="background:#4A3E3D;" onclick="saveMarket()">儲存今日市場紀錄</button>
+          </div>
+          <div style="padding:0 12px; font-size:11px; font-weight:bold; color:gray;">當月市場明細</div>
+          ${data.fMarket.map(r => `
+            <div class="list-item market">
+              <div>
+                <div style="font-weight:bold;">📍 ${r.location}</div>
+                <div style="font-size:10px; color:gray; margin-top:2px;">位租:$${r.rent} | 油:$${r.gas} | 清:$${r.cleaning} | 電/停:$${r.electricity+r.parking}</div>
+              </div>
+              <div style="font-weight:bold; color:green;">+$${r.performance}</div>
+            </div>
+          `).join('')}
+        `;
+      }
+      
+      if (activeTab === 'analytics') {
+        const totalRev = data.mRevenue || 1;
+        const rentP = ((data.mRent / totalRev) * 100).toFixed(0);
+        const restExpenses = data.mTotalExpenses - data.mRent;
+        const expP = ((restExpenses / totalRev) * 100).toFixed(0);
+        const netP = (100 - Number(rentP) - Number(expP));
+
+        main.innerHTML = `
+          <div class="card">
+            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📊 雙軌實賺獨立結算</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:8px 0; border-bottom:1px solid #eee;"><span>📦 超商管道實賺：</span><span style="font-weight:bold; color:#8D4B38; font-size:14px;">$${data.sNetProfit.toFixed(0)}</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:8px 0;"><span>🎪 市場攤位實賺：</span><span style="font-weight:bold; color:#4A3E3D; font-size:14px;">$${data.mNetProfit.toFixed(0)}</span></div>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📌 市場完整成本佔比分析報告</h3>
+            <div style="background:#eee; height:16px; border-radius:8px; overflow:hidden; display:flex; font-size:9px; color:white; text-align:center; font-weight:bold;">
+              <div style="background:#A78B71; width: ${data.mRevenue > 0 ? netP : 65}%;">實賺 ${data.mRevenue > 0 ? netP : 65}%</div>
+              <div style="background:#8D4B38; width: ${data.mRevenue > 0 ? rentP : 20}%;">位租 ${data.mRevenue > 0 ? rentP : 20}%</div>
+              <div style="background:#d97706; width: ${data.mRevenue > 0 ? expP : 15}%;">雜支 ${data.mRevenue > 0 ? expP : 15}%</div>
+            </div>
+            <div style="font-size:12px; margin-top:10px; color:#555; line-height:1.6;">
+              <strong>當月市場總收入：$${data.mRevenue.toFixed(0)}</strong><br>
+              • 房屋位租：$${data.mRent} | • 加油錢：$${data.mGas}<br>
+              • 清潔費：$${data.mClean} | • 電費：$${data.mElectricity}<br>
+              • 停車費：$${data.mPark}<br>
+              <span style="color:red; font-weight:bold;">當月總支出：-$${data.mTotalExpenses}</span>
+            </div>
+          </div>
+          <button class="save-btn" style="background:#fee2e2; color:#dc2626; margin:12px; width:calc(100% - 24px);" onclick="if(confirm('確定要清空數據重來嗎？')){localStorage.clear();location.reload();}">⚠️ 清除手機內所有記帳資料</button>
+        `;
+      }
+      
+      if (activeTab === 'report') {
+        const pM = currentMonth === 1 ? 12 : currentMonth - 1;
+        const pY = currentMonth === 1 ? currentYear - 1 : currentYear;
+        const pData = calculateData(pY, pM);
+        const sG = pData.sNetProfit === 0 ? 0 : ((data.sNetProfit - pData.sNetProfit) / Math.abs(pData.sNetProfit) * 100);
+        const mG = pData.mNetProfit === 0 ? 0 : ((data.mNetProfit - pData.mNetProfit) / Math.abs(pData.mNetProfit) * 100);
+        main.innerHTML = `
+          <div class="card">
+            <h3 style="margin:0 0 8px 0; font-size:12px; color:gray;">📅 1-12月份 獨立營收成長率報告</h3>
+            <div style="font-size:12px; line-height:1.8;">
+              <span style="font-weight:bold; color:#8D4B38;">${currentYear}年 ${currentMonth}月 本月結算：</span><br>
+              • 超商實賺：$${data.sNetProfit.toFixed(0)} <strong style="color:${sG>=0?'green':'red'}">比上月 ${sG>=0?'+':''}${sG.toFixed(1)}%</strong><br>
+              • 市場實賺：$${data.mNetProfit.toFixed(0)} <strong style="color:${mG>=0?'green':'red'}">比上月 ${mG>=0?'+':''}${mG.toFixed(1)}%</strong>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    window.saveShipping = function() {
+      const name = document.getElementById('s-name').value;
+      const amount = Number(document.getElementById('s-amount').value);
+      const type = document.getElementById('s-type').value;
+      const isFree = document.getElementById('s-isFree').value === 'true';
+      if(!name || !amount) return alert('姓名金額都要填唷');
+      shippingRecords.push({ year: currentYear, month: currentMonth, name, amount, type, isFree });
+      saveData(); updateUI();
+    };
+
+    window.saveMarket = function() {
+      const location = document.getElementById('m-loc').value;
+      const performance = Number(document.getElementById('m-perf').value);
+      const rent = Number(document.getElementById('m-rent').value);
+      const gas = Number(document.getElementById('m-gas').value) || 0;
+      const cleaning = Number(document.getElementById('m-clean').value) || 0;
+      const electricity = Number(document.getElementById('m-elec').value) || 0;
+      const parking = Number(document.getElementById('m-park').value) || 0;
+      const note = document.getElementById('m-note').value;
+      if(!location || !performance || !rent) return alert('地點、業績和位租都要填唷');
+      marketRecords.push({ year: currentYear, month: currentMonth, location, performance, rent, gas, cleaning, electricity, parking, note });
+      saveData(); updateUI();
+    };
+
+    document.getElementById('select-year').addEventListener('change', (e) => { currentYear = Number(e.target.value); updateUI(); });
+    document.getElementById('select-month').addEventListener('change', (e) => { currentMonth = Number(e.target.value); updateUI(); });
+    document.getElementById('tab-conv').addEventListener('click', () => { activeTab = 'convenience'; updateUI(); });
+    document.getElementById('tab-market').addEventListener('click', () => { activeTab = 'market'; updateUI(); });
+    document.getElementById('tab-stats').addEventListener('click', () => { activeTab = 'analytics'; updateUI(); });
+    document.getElementById('tab-report').addEventListener('click', () => { activeTab = 'report'; updateUI(); });
+    
+    updateUI();
   </script>
 </body>
 </html>
