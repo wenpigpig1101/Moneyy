@@ -104,14 +104,14 @@
             <div className="space-y-3">
               <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
               <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
-              <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
+              <input type="number" placeholder="代收總金額 (含運費)" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
               <div className="grid grid-cols-2 gap-3">
                 <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
                   <option value="7-11">7-11 (運費$38)</option>
                   <option value="全家">全家 (運費$39)</option>
                 </select>
                 <select value={form.isFreeShipping} onChange={e=>setForm({...form, isFreeShipping:e.target.value === 'true'})} className={INPUT_STYLE}>
-                  <option value={false}>運費：買家付</option>
+                  <option value={false}>運費：買家付 (+60)</option>
                   <option value={true}>運費：免運</option>
                 </select>
               </div>
@@ -128,7 +128,7 @@
                     <div className="font-bold text-[#5C4D42] flex items-center gap-1">⭐️ {r.name}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {formatShortDate(r.date)} | {r.storeType} | <span className="font-bold text-gray-700">${r.amount}</span>
-                      {r.isFreeShipping && <span className="ml-2 text-red-500 bg-red-50 px-1 rounded">免運</span>}
+                      {r.isFreeShipping ? <span className="ml-2 text-red-500 bg-red-50 px-1 rounded">免運</span> : <span className="ml-2 text-gray-400">買家付運</span>}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
@@ -175,24 +175,20 @@
     }
 
     // ==========================================
-    // 2. 市場營業分頁 (MarketTab) - 升級日曆版
+    // 2. 市場營業分頁 (MarketTab) 
     // ==========================================
     function MarketTab({ records, setRecords, setEditingMarket, showToast }) {
       const [selectedDate, setSelectedDate] = useState(getToday());
-      
-      // 日曆顯示的年月 (預設為選中日期的年月)
       const [calMonth, setCalMonth] = useState(new Date(selectedDate).getMonth() + 1);
       const [calYear, setCalYear] = useState(new Date(selectedDate).getFullYear());
 
-      const [form, setForm] = useState({ date: selectedDate, location: '', perf: '', rent: '', note: '' });
+      const [form, setForm] = useState({ date: selectedDate, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '' });
 
-      // 當你在日曆點擊某天，表單的日期也會自動變成那一天
       const handleDateSelect = (dateStr) => {
         setSelectedDate(dateStr);
         setForm(f => ({ ...f, date: dateStr }));
       };
 
-      // 手動改變表單日期時，日曆與選中日也會同步跳過去
       const handleFormDateChange = (e) => {
         const newDateStr = e.target.value;
         setForm(f => ({ ...f, date: newDateStr }));
@@ -207,11 +203,10 @@
       const addRec = () => {
         if (!form.location || !form.perf || !form.rent) return showToast('⚠️ 地點、業績與位租必填');
         setRecords(p => [{ id: genId(), ...form }, ...p]);
-        setForm(f => ({ ...f, location: '', perf: '', rent: '', note: '' }));
+        setForm(f => ({ ...f, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '' }));
         showToast('✅ 已新增市場紀錄');
       };
 
-      // --- 日曆計算邏輯 ---
       const handlePrevMonth = () => {
         if (calMonth === 1) { setCalMonth(12); setCalYear(y => y - 1); } else { setCalMonth(m => m - 1); }
       };
@@ -220,10 +215,9 @@
       };
 
       const pad = (n) => String(n).padStart(2, '0');
-      const firstDay = new Date(calYear, calMonth - 1, 1).getDay(); // 0:Sun, 1:Mon
+      const firstDay = new Date(calYear, calMonth - 1, 1).getDay(); 
       const daysInMonth = new Date(calYear, calMonth, 0).getDate();
 
-      // 把資料用日期分組，方便日曆讀取
       const recordsByDate = records.reduce((acc, r) => {
         acc[r.date] = acc[r.date] || [];
         acc[r.date].push(r);
@@ -232,16 +226,28 @@
 
       const selectedRecords = recordsByDate[selectedDate] || [];
 
-      // 把長長的數字轉換成易讀的「萬」字 (例如 25000 -> 2.5萬)
+      const dailyPerf = selectedRecords.reduce((sum, r) => sum + Number(r.perf || 0), 0);
+      const dailyRent = selectedRecords.reduce((sum, r) => sum + Number(r.rent || 0), 0);
+      const dailyMisc = selectedRecords.reduce((sum, r) => sum + Number(r.elec||0) + Number(r.clean||0) + Number(r.gas||0) + Number(r.toll||0), 0);
+      const dailyNet = (dailyPerf * 0.35) - dailyRent - dailyMisc;
+
       const formatPerf = (numStr) => {
         const n = Number(numStr);
         if (n >= 10000) return (n / 10000).toFixed(1).replace('.0', '') + '萬';
         return n;
       };
 
+      const formatMiscText = (r) => {
+        let parts = [];
+        if (r.elec) parts.push(`電:$${r.elec}`);
+        if (r.clean) parts.push(`清:$${r.clean}`);
+        if (r.gas) parts.push(`油:$${r.gas}`);
+        if (r.toll) parts.push(`路:$${r.toll}`);
+        return parts.length > 0 ? parts.join(' | ') : '';
+      };
+
       return (
         <div className="animate-fade-in space-y-5">
-          {/* 表單區塊 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
             <h2 className="text-[#5C4D42] font-bold mb-3">🛒 新增市場營業</h2>
             <div className="space-y-3">
@@ -254,11 +260,18 @@
                 <input type="number" placeholder="位租" value={form.rent} onChange={e=>setForm({...form, rent:e.target.value})} className={INPUT_STYLE} />
                 <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
               </div>
-              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存紀錄</button>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" placeholder="電費 (選填)" value={form.elec} onChange={e=>setForm({...form, elec:e.target.value})} className={INPUT_STYLE} />
+                <input type="number" placeholder="清潔費 (選填)" value={form.clean} onChange={e=>setForm({...form, clean:e.target.value})} className={INPUT_STYLE} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input type="number" placeholder="油錢 (選填)" value={form.gas} onChange={e=>setForm({...form, gas:e.target.value})} className={INPUT_STYLE} />
+                <input type="number" placeholder="過路費 (選填)" value={form.toll} onChange={e=>setForm({...form, toll:e.target.value})} className={INPUT_STYLE} />
+              </div>
+              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold mt-2">儲存紀錄</button>
             </div>
           </div>
 
-          {/* 📅 業績日曆區塊 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <button onClick={handlePrevMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">◀</button>
@@ -266,19 +279,15 @@
               <button onClick={handleNextMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">▶</button>
             </div>
 
-            {/* 日曆星期標頭 */}
             <div className="grid grid-cols-7 gap-1 text-center mb-2">
               {['日', '一', '二', '三', '四', '五', '六'].map(d => (
                 <div key={d} className="text-xs text-gray-400 font-bold">{d}</div>
               ))}
             </div>
 
-            {/* 日曆格子 */}
             <div className="grid grid-cols-7 gap-1">
-              {/* 月初空白格 */}
               {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
               
-              {/* 日期格子 */}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const d = i + 1;
                 const dateStr = `${calYear}-${pad(calMonth)}-${pad(d)}`;
@@ -297,9 +306,7 @@
                     }`}
                     style={{ minHeight: '3.5rem' }}
                   >
-                    {/* 日期數字 */}
                     <span className={`text-[11px] ${isSelected ? 'font-bold text-white' : hasRecord ? 'font-bold text-[#5C4D42]' : ''}`}>{d}</span>
-                    {/* 業績提示 (例如: 2.5萬) */}
                     {hasRecord && (
                       <span className={`text-[10px] font-bold mt-auto truncate w-full text-center tracking-tighter ${isSelected ? 'text-white' : 'text-green-600'}`}>
                         {formatPerf(totalPerf)}
@@ -311,12 +318,24 @@
             </div>
           </div>
 
-          {/* 📍 點選日期的明細清單 */}
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-[#5C4D42] mb-3 flex items-center gap-2">
               📍 {calMonth}/{Number(selectedDate.split('-')[2])} 營業紀錄
               <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{selectedRecords.length} 筆</span>
             </h4>
+
+            {selectedRecords.length > 0 && (
+              <div className="bg-[#FDFBF7] p-3 rounded-xl border border-[#E3D5CA] text-sm text-[#5C4D42] mb-3 shadow-sm">
+                <div className="flex justify-between font-bold mb-1 pb-1 border-b border-[#E3D5CA]/50">
+                  <span>當日總業績: ${dailyPerf}</span>
+                  <span className="text-[#C3A995]">當日實賺: ${dailyNet.toFixed(0)}</span>
+                </div>
+                <div className="text-xs text-gray-500 flex justify-between mt-1">
+                  <span>總位租: ${dailyRent}</span>
+                  <span>總雜支(電/清/油/路): <strong className="text-red-400">${dailyMisc}</strong></span>
+                </div>
+              </div>
+            )}
 
             {selectedRecords.map(r => (
               <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-gray-400 animate-fade-in">
@@ -324,8 +343,9 @@
                   <div className="font-bold text-[#5C4D42]">📍 {r.location}</div>
                   <div className="font-bold text-green-600">+${r.perf}</div>
                 </div>
-                <div className="text-xs text-gray-500 mt-2 flex justify-between">
+                <div className="text-xs text-gray-500 mt-2 flex flex-col gap-1">
                   <span>租金: ${r.rent} {r.note ? `| 備註: ${r.note}` : ''}</span>
+                  {formatMiscText(r) && <span className="text-red-400">{formatMiscText(r)}</span>}
                 </div>
                 <div className="flex justify-end gap-3 mt-2">
                   <button onClick={()=>setEditingMarket(r)} className="text-xs text-blue-500 font-bold">編輯</button>
@@ -334,7 +354,6 @@
               </div>
             ))}
             
-            {/* 休息日提示 */}
             {selectedRecords.length === 0 && (
               <div className="text-center text-gray-400 text-sm py-6 bg-white rounded-xl border border-dashed border-gray-200">
                 這天沒有擺攤，是休息日喔 ☕️
@@ -346,7 +365,7 @@
     }
 
     // ==========================================
-    // 3. 報表分頁 (ReportTab)
+    // 3. 報表分頁 (ReportTab) - 精準運費運算
     // ==========================================
     function ReportTab({ storeRecords, marketRecords, showToast }) {
       const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -361,19 +380,43 @@
       const sData = storeRecords.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
       const mData = marketRecords.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
 
-      const sCount = sData.length;
-      const sTotalAmt = sData.reduce((acc, r) => acc + Number(r.amount||0), 0);
-      const sRev = sTotalAmt * 0.35;
-      const sCost = sData.reduce((acc, r) => acc + Number(r.shippingFee||0), 0);
-      const sNet = sRev - sCost;
+      // --- 📌 精準運算：超商寄件 ---
+      let sCount = sData.length;
+      let sTotalAmt = 0;           // 客人付的總代收金額
+      let sItemAmountTotal = 0;    // 純商品金額 (用來算35%)
+      let sShippingCollected = 0;  // 向客人收取的運費 (假設買家付就是60元)
+      let sActualCost = 0;         // 實際付給超商的運費 (38或39)
 
+      sData.forEach(r => {
+        let amt = Number(r.amount || 0);
+        let actualFee = Number(r.shippingFee || 0);
+        
+        sTotalAmt += amt;
+        sActualCost += actualFee;
+
+        if (r.isFreeShipping) {
+          // 免運：沒有跟客人收運費，金額全都是商品
+          sItemAmountTotal += amt;
+        } else {
+          // 買家付：代表總金額裡面包含了 60 元的運費
+          let itemAmt = amt - 60;
+          if (itemAmt < 0) itemAmt = 0; // 防呆
+          sItemAmountTotal += itemAmt;
+          sShippingCollected += 60;
+        }
+      });
+
+      const sRev = sItemAmountTotal * 0.35; // 商品淨利 (真正該被抽成的地方)
+      const sShippingProfit = sShippingCollected - sActualCost; // 運費盈虧 (收60 - 付38 = 賺22)
+      const sNet = sRev + sShippingProfit; // 真正的超商實賺！
+
+      // --- 📌 市場結算 ---
       const mPerf = mData.reduce((acc, r) => acc + Number(r.perf||0), 0);
       const mRev = mPerf * 0.35;
       const mRent = mData.reduce((acc, r) => acc + Number(r.rent||0), 0);
-      const mNet = mRev - mRent;
+      const mMisc = mData.reduce((acc, r) => acc + Number(r.elec||0) + Number(r.clean||0) + Number(r.gas||0) + Number(r.toll||0), 0);
+      const mNet = mRev - mRent - mMisc;
 
-      const totalNet = sNet + mNet;
-      
       let percent = 0;
       if (targetProfit > 0) {
         percent = Math.floor((mNet / targetProfit) * 100);
@@ -385,7 +428,7 @@
       const avgStoreNet = sCount > 0 ? (sNet / sCount).toFixed(0) : 0;
 
       const copyReport = () => {
-        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)}\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}`;
+        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)} (含雜支扣除)\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}`;
         const textArea = document.createElement("textarea");
         textArea.value = text;
         document.body.appendChild(textArea);
@@ -450,26 +493,35 @@
             </div>
           </div>
 
+          {/* 🔥 更新後的超商結算報表 🔥 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between items-end">
               <span>📦 超商結算 <span className="text-xs text-gray-400 font-normal">(僅計已出貨)</span></span>
-              <span className="text-[#C3A995]">實賺 ${sNet.toFixed(0)}</span>
+              <span className="text-[#C3A995] text-lg">實賺 ${sNet.toFixed(0)}</span>
             </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>寄件數</span><strong className="text-black">{sCount} 件</strong></div>
-              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總金額</span><strong className="text-black">${sTotalAmt}</strong></div>
-              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總運費</span><strong className="text-red-500">${sCost}</strong></div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>寄件數</span><strong className="text-black">{sCount} 件</strong></div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>代收總金額</span><strong className="text-black">${sTotalAmt}</strong></div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2">
+                <span>商品淨利 <span className="text-xs text-gray-400">(扣運費後 x35%)</span></span>
+                <strong className="text-green-600">+{sRev.toFixed(0)}</strong>
+              </div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2">
+                <span>運費盈虧 <span className="text-xs text-gray-400">(收${sShippingCollected} - 付${sActualCost})</span></span>
+                <strong className={sShippingProfit >= 0 ? "text-green-600" : "text-red-500"}>{sShippingProfit >= 0 ? '+' : ''}{sShippingProfit}</strong>
+              </div>
             </div>
           </div>
 
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between">
               <span>🛒 市場結算</span>
-              <span className="text-[#5C4D42]">實賺 ${mNet.toFixed(0)}</span>
+              <span className="text-[#C3A995] text-lg">實賺 ${mNet.toFixed(0)}</span>
             </h3>
-            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總業績</span><strong className="text-black">${mPerf}</strong></div>
-              <div className="flex justify-between bg-gray-50 p-3 rounded-lg col-span-2"><span>總位租</span><strong className="text-red-500">${mRent}</strong></div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-600">
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>總業績</span><strong className="text-black">${mPerf}</strong></div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>總位租</span><strong className="text-red-500">-${mRent}</strong></div>
+              <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>總雜支<span className="text-xs text-gray-400 font-normal">(電/清/油/路)</span></span><strong className="text-red-500">-${mMisc}</strong></div>
             </div>
           </div>
           
@@ -576,7 +628,9 @@
       const [editingStore, setEditingStore] = useState(null);
       const [editingMarket, setEditingMarket] = useState(null);
       const [editingReserve, setEditingReserve] = useState(null);
-      const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11' });
+      
+      // 轉移視窗加入 isFreeShipping 狀態
+      const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false });
 
       useEffect(() => localStorage.setItem('xq_store', JSON.stringify(storeRecords)), [storeRecords]);
       useEffect(() => localStorage.setItem('xq_market', JSON.stringify(marketRecords)), [marketRecords]);
@@ -611,22 +665,30 @@
       };
 
       const confirmTransfer = () => {
-        const { record, storeType } = transferModal;
-        const autoAmount = Number(record.quantity) * 200;
+        const { record, storeType, isFreeShipping } = transferModal;
+        
+        // 如果是買家付運費，總金額自動 +60
+        const baseAmount = Number(record.quantity) * 200;
+        const autoAmount = isFreeShipping ? baseAmount : baseAmount + 60;
+        
         const fee = storeType === '7-11' ? 38 : 39;
         
         const newRec = {
           id: genId(), date: getToday(), name: record.name, amount: autoAmount,
-          storeType, isFreeShipping: false, shippingFee: fee, status: 'pending'
+          storeType, isFreeShipping, shippingFee: fee, status: 'pending' 
         };
         
         setStoreRecords(p => [newRec, ...p]);
         setReserveRecords(p => p.filter(r => r.id !== record.id));
-        setTransferModal({ isOpen: false, record: null, storeType: '7-11' });
+        setTransferModal({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false });
         
         setActiveTab('store');
         showToast(`✅ 已轉入未寄出清單`);
       };
+
+      // 計算彈出視窗預覽的金額
+      const baseTransferAmt = transferModal.record ? Number(transferModal.record.quantity) * 200 : 0;
+      const transferShippingFee = transferModal.isFreeShipping ? 0 : 60;
 
       return (
         <div className="min-h-screen pb-safe">
@@ -661,13 +723,21 @@
                 <h3 className="font-bold text-[#5C4D42] mb-3">🔄 轉入超商未寄出</h3>
                 <div className="text-sm text-gray-500 mb-4 bg-gray-50 p-3 rounded-xl leading-relaxed">
                   將自動帶入訂購人：<strong className="text-black">{transferModal.record.name}</strong><br/>
-                  系統自動換算金額：數量 {transferModal.record.quantity} × 200 = <strong className="text-black">${transferModal.record.quantity * 200}</strong>
+                  系統代收金額：商品 ${baseTransferAmt} + 運費 ${transferShippingFee} = <strong className="text-black">${baseTransferAmt + transferShippingFee}</strong>
                 </div>
-                <p className="text-xs font-bold text-gray-500 mb-2">請選擇寄件超商：</p>
+                
+                <p className="text-xs font-bold text-gray-500 mb-2">運費設定：</p>
+                <select value={transferModal.isFreeShipping} onChange={e=>setTransferModal({...transferModal, isFreeShipping: e.target.value === 'true'})} className={INPUT_STYLE + " mb-3"}>
+                  <option value={false}>運費：買家付 (+60)</option>
+                  <option value={true}>運費：免運 (+0)</option>
+                </select>
+
+                <p className="text-xs font-bold text-gray-500 mb-2">寄件超商：</p>
                 <select value={transferModal.storeType} onChange={e=>setTransferModal({...transferModal, storeType: e.target.value})} className={INPUT_STYLE + " mb-4"}>
                   <option value="7-11">7-11 (運費$38)</option>
                   <option value="全家">全家 (運費$39)</option>
                 </select>
+
                 <div className="flex gap-3">
                   <button onClick={()=>setTransferModal({isOpen:false})} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
                   <button onClick={confirmTransfer} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold shadow-md">轉入清單</button>
@@ -683,7 +753,7 @@
                 <div className="space-y-3">
                   <input type="date" value={editingStore.date} onChange={e=>setEditingStore({...editingStore, date:e.target.value})} className={INPUT_STYLE}/>
                   <input type="text" value={editingStore.name} onChange={e=>setEditingStore({...editingStore, name:e.target.value})} className={INPUT_STYLE}/>
-                  <input type="number" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:e.target.value})} className={INPUT_STYLE}/>
+                  <input type="number" placeholder="代收總金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:e.target.value})} className={INPUT_STYLE}/>
                   <div className="flex gap-3 pt-2">
                     <button onClick={()=>setEditingStore(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
                     <button onClick={()=>{setStoreRecords(p=>p.map(r=>r.id===editingStore.id ? editingStore : r)); setEditingStore(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
@@ -695,9 +765,9 @@
 
           {editingMarket && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
-              <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
+              <div className="bg-white rounded-3xl p-6 w-full max-w-sm h-[80vh] overflow-y-auto">
                 <h3 className="font-bold text-[#5C4D42] mb-3">✏️ 編輯市場紀錄</h3>
-                <div className="space-y-3">
+                <div className="space-y-3 pb-6">
                   <input type="date" value={editingMarket.date} onChange={e=>setEditingMarket({...editingMarket, date:e.target.value})} className={INPUT_STYLE}/>
                   <div className="grid grid-cols-2 gap-2">
                     <input type="text" placeholder="地點" value={editingMarket.location} onChange={e=>setEditingMarket({...editingMarket, location:e.target.value})} className={INPUT_STYLE}/>
@@ -706,6 +776,14 @@
                   <div className="grid grid-cols-2 gap-2">
                     <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:e.target.value})} className={INPUT_STYLE}/>
                     <input type="text" placeholder="備註" value={editingMarket.note} onChange={e=>setEditingMarket({...editingMarket, note:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="電費" value={editingMarket.elec || ''} onChange={e=>setEditingMarket({...editingMarket, elec:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="清潔費" value={editingMarket.clean || ''} onChange={e=>setEditingMarket({...editingMarket, clean:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" placeholder="油錢" value={editingMarket.gas || ''} onChange={e=>setEditingMarket({...editingMarket, gas:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="過路費" value={editingMarket.toll || ''} onChange={e=>setEditingMarket({...editingMarket, toll:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button onClick={()=>setEditingMarket(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
@@ -740,7 +818,7 @@
             {activeTab === 'store' && <StoreTab records={storeRecords} setRecords={setStoreRecords} setEditingStore={setEditingStore} showToast={showToast} />}
             {activeTab === 'market' && <MarketTab records={marketRecords} setRecords={setMarketRecords} setEditingMarket={setEditingMarket} showToast={showToast} />}
             {activeTab === 'reports' && <ReportTab storeRecords={storeRecords} marketRecords={marketRecords} showToast={showToast} />}
-            {activeTab === 'reserve' && <ReserveTab records={reserveRecords} setRecords={setReserveRecords} setEditingReserve={setEditingReserve} showToast={showToast} onCheckBoxClick={(r) => setTransferModal({ isOpen: true, record: r, storeType: '7-11' })} />}
+            {activeTab === 'reserve' && <ReserveTab records={reserveRecords} setRecords={setReserveRecords} setEditingReserve={setEditingReserve} showToast={showToast} onCheckBoxClick={(r) => setTransferModal({ isOpen: true, record: r, storeType: '7-11', isFreeShipping: false })} />}
           </main>
 
           <nav className="fixed bottom-0 w-full bg-white border-t flex justify-around shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-40 pb-[env(safe-area-inset-bottom)]">
