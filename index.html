@@ -27,7 +27,7 @@
       color: #5C4D42; 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
       -webkit-tap-highlight-color: transparent;
-      touch-action: pan-y; 
+      touch-action: pan-y; /* 核心：告訴手機只能上下滑，徹底禁止左右觸控滑動 */
     }
     #root {
       width: 100%;
@@ -58,7 +58,9 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    const INPUT_STYLE = "p-3 border border-gray-200 rounded-xl outline-none focus:border-[#C3A995] text-gray-800 text-sm w-full";
+    const INPUT_STYLE = "p-3 border border-gray-200 rounded-xl outline-none focus:border-[#C3A995] text-gray-800 text-sm w-full bg-white";
+    
+    // 取得今天日期 YYYY-MM-DD
     const getToday = () => {
       const d = new Date();
       const pad = (n) => String(n).padStart(2, '0');
@@ -72,7 +74,7 @@
     };
 
     // ==========================================
-    // 1. 超商寄件分頁 (StoreTab)
+    // 1. 超商寄件分頁 (StoreTab) - 垂直一頁式
     // ==========================================
     function StoreTab({ records, setRecords, setEditingStore, showToast }) {
       const [form, setForm] = useState({ date: getToday(), name: '', amount: '', storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
@@ -80,7 +82,7 @@
       const addRec = () => {
         if (!form.name || !form.amount) return showToast('⚠️ 姓名與金額必填');
         const fee = form.storeType === '7-11' ? 38 : 39;
-        setRecords(p => [{ id: genId(), ...form, shippingFee: fee, status: 'pending' }, ...p]);
+        setRecords(p => [{ id: genId(), ...form, amount: Number(form.amount), shippingFee: fee, status: 'pending' }, ...p]);
         setForm({ ...form, name: '', amount: '', giftType: '無', giftQty: '' });
         showToast('✅ 已新增未寄出訂單');
       };
@@ -100,12 +102,13 @@
 
       return (
         <div className="animate-fade-in space-y-6">
+          {/* 新增表單 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
             <h2 className="text-[#5C4D42] font-bold mb-3">📦 新增寄件</h2>
             <div className="space-y-3">
               <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
               <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
-              <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
+              <input type="number" placeholder="金額 (含運費)" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
               <div className="grid grid-cols-2 gap-3">
                 <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
                   <option value="7-11">7-11 (運費$38)</option>
@@ -116,8 +119,8 @@
                   <option value={true}>運費：免運</option>
                 </select>
               </div>
-              
-              {/* 🎁 贈品選填欄位 */}
+
+              {/* 🎁 贈品選填 */}
               <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
                 <select value={form.giftType} onChange={e=>setForm({...form, giftType:e.target.value})} className={INPUT_STYLE}>
                   <option value="無">🎁 無贈品</option>
@@ -129,11 +132,12 @@
                 </select>
                 <input type="number" placeholder="贈品數量" value={form.giftQty} onChange={e=>setForm({...form, giftQty:e.target.value})} className={INPUT_STYLE} />
               </div>
-              
+
               <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">新增寄件</button>
             </div>
           </div>
 
+          {/* 未寄出清單 */}
           <div>
             <h3 className="text-[#5C4D42] font-bold mb-3 flex items-center gap-2">📌 未寄出 <span className="bg-[#C3A995] text-white text-xs px-2 py-1 rounded-full">{pendingList.length}</span></h3>
             <div className="space-y-2">
@@ -164,6 +168,7 @@
             </div>
           </div>
 
+          {/* 已寄出清單 */}
           <div>
             <h3 className="text-gray-400 font-bold mb-3">✅ 已寄出</h3>
             <div className="space-y-2 opacity-80">
@@ -196,7 +201,7 @@
     }
 
     // ==========================================
-    // 2. 市場營業分頁 (MarketTab)
+    // 2. 市場營業分頁 (MarketTab) - 升級日曆與雜支贈品版
     // ==========================================
     function MarketTab({ records, setRecords, setEditingMarket, showToast }) {
       const [selectedDate, setSelectedDate] = useState(getToday());
@@ -223,7 +228,7 @@
 
       const addRec = () => {
         if (!form.location || !form.perf || !form.rent) return showToast('⚠️ 地點、業績與位租必填');
-        setRecords(p => [{ id: genId(), ...form }, ...p]);
+        setRecords(p => [{ id: genId(), ...form, perf: Number(form.perf), rent: Number(form.rent) }, ...p]);
         setForm(f => ({ ...f, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '' }));
         showToast('✅ 已新增市場紀錄');
       };
@@ -253,7 +258,7 @@
       const dailyMisc = selectedRecords.reduce((sum, r) => sum + Number(r.elec||0) + Number(r.clean||0) + Number(r.gas||0) + Number(r.toll||0), 0);
       const dailyNet = (dailyPerf * 0.35) - dailyRent - dailyMisc;
 
-      // 彙整當日送出贈品
+      // 當日送出贈品
       const dailyGifts = selectedRecords.reduce((acc, r) => {
         if (r.giftType && r.giftType !== '無' && Number(r.giftQty) > 0) {
           acc[r.giftType] = (acc[r.giftType] || 0) + Number(r.giftQty);
@@ -278,6 +283,7 @@
 
       return (
         <div className="animate-fade-in space-y-5">
+          {/* 新增表單 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
             <h2 className="text-[#5C4D42] font-bold mb-3">🛒 新增市場營業</h2>
             <div className="space-y-3">
@@ -290,6 +296,8 @@
                 <input type="number" placeholder="位租" value={form.rent} onChange={e=>setForm({...form, rent:e.target.value})} className={INPUT_STYLE} />
                 <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
               </div>
+              
+              {/* 選填欄位：雜支 */}
               <div className="grid grid-cols-2 gap-3">
                 <input type="number" placeholder="電費 (選填)" value={form.elec} onChange={e=>setForm({...form, elec:e.target.value})} className={INPUT_STYLE} />
                 <input type="number" placeholder="清潔費 (選填)" value={form.clean} onChange={e=>setForm({...form, clean:e.target.value})} className={INPUT_STYLE} />
@@ -299,7 +307,7 @@
                 <input type="number" placeholder="過路費 (選填)" value={form.toll} onChange={e=>setForm({...form, toll:e.target.value})} className={INPUT_STYLE} />
               </div>
               
-              {/* 🎁 贈品選填欄位 */}
+              {/* 🎁 贈品選填 */}
               <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
                 <select value={form.giftType} onChange={e=>setForm({...form, giftType:e.target.value})} className={INPUT_STYLE}>
                   <option value="無">🎁 無贈品</option>
@@ -316,6 +324,7 @@
             </div>
           </div>
 
+          {/* 📅 業績日曆 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <button onClick={handlePrevMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">◀</button>
@@ -362,13 +371,14 @@
             </div>
           </div>
 
+          {/* 📍 當日明細清單與當日統計 */}
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-[#5C4D42] mb-3 flex items-center gap-2">
               📍 {calMonth}/{Number(selectedDate.split('-')[2])} 營業紀錄
               <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{selectedRecords.length} 筆</span>
             </h4>
 
-            {/* 當日統計卡片 */}
+            {/* 當日總結 */}
             {selectedRecords.length > 0 && (
               <div className="bg-[#FDFBF7] p-3 rounded-xl border border-[#E3D5CA] text-sm text-[#5C4D42] mb-3 shadow-sm space-y-1">
                 <div className="flex justify-between font-bold pb-1 border-b border-[#E3D5CA]/50">
@@ -418,7 +428,7 @@
     }
 
     // ==========================================
-    // 3. 報表分頁 (ReportTab) - 統整贈品
+    // 3. 報表分頁 (ReportTab) - 精準運費、贈品與目標進度
     // ==========================================
     function ReportTab({ storeRecords, marketRecords, showToast }) {
       const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -430,11 +440,11 @@
 
       useEffect(() => localStorage.setItem('xq_target', targetProfit), [targetProfit]);
 
-      // 取得當月資料 (超商已寄出與市場)
+      // 超商結算僅計算「已出貨 (shipped)」
       const sData = storeRecords.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
       const mData = marketRecords.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
 
-      // --- 📌 超商寄件實賺計算 ---
+      // --- 📌 精確統計：超商寄件 ---
       let sCount = sData.length;
       let sTotalAmt = 0;           
       let sItemAmountTotal = 0;    
@@ -470,6 +480,7 @@
 
       const totalNet = sNet + mNet;
       
+      // 目標進度條只看市場實賺 mNet
       let percent = 0;
       if (targetProfit > 0) {
         percent = Math.floor((mNet / targetProfit) * 100);
@@ -497,12 +508,12 @@
       const totalGiftsSent = Object.values(monthlyGifts).reduce((sum, q) => sum + q, 0);
 
       const copyReport = () => {
-        const giftList = Object.entries(monthlyGifts)
+        const giftListText = Object.entries(monthlyGifts)
           .filter(([_, q]) => q > 0)
           .map(([type, q]) => `${type} x${q}`)
           .join(', ');
 
-        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)}\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}\n🎁 送出贈品總計：${totalGiftsSent > 0 ? giftList : '無'}`;
+        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)} (含雜支扣除)\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}\n🎁 送出贈品總計：${totalGiftsSent > 0 ? giftListText : '無'}`;
         
         const textArea = document.createElement("textarea");
         textArea.value = text;
@@ -552,6 +563,7 @@
             </select>
           </div>
 
+          {/* 🎯 目標進度條 (只看市場) */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold text-[#5C4D42] flex items-center gap-1">🎯 市場目標進度</span>
@@ -568,6 +580,7 @@
             </div>
           </div>
 
+          {/* 超商結算報表 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between items-end">
               <span>📦 超商結算 <span className="text-xs text-gray-400 font-normal">(僅計已出貨)</span></span>
@@ -587,6 +600,7 @@
             </div>
           </div>
 
+          {/* 市場結算報表 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between">
               <span>🛒 市場結算</span>
@@ -599,7 +613,7 @@
             </div>
           </div>
 
-          {/* 🎁 全新功能：當月贈品統計卡片 */}
+          {/* 🎁 當月贈品統計 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-3 border-b border-gray-100 pb-2 flex justify-between items-center">
               <span>🎁 當月贈品統計</span>
@@ -623,6 +637,7 @@
             )}
           </div>
           
+          {/* 當月營運亮點 */}
           <div className="bg-[#C3A995] text-white p-5 rounded-2xl shadow-sm mb-6">
             <h3 className="font-bold mb-4 border-b border-white/20 pb-2 flex justify-between items-center">
               <span>✨ {month}月 營運亮點</span>
@@ -651,7 +666,7 @@
     }
 
     // ==========================================
-    // 4. 留貨單待辦分頁 (ReserveTab)
+    // 4. 留貨單待辦 (ReserveTab)
     // ==========================================
     function ReserveTab({ records, setRecords, onCheckBoxClick, setEditingReserve, showToast }) {
       const [form, setForm] = useState({ date: getToday(), name: '', quantity: '', note: '' });
@@ -659,7 +674,7 @@
 
       const addRec = () => {
         if (!form.name || !form.quantity) return showToast('⚠️ 姓名與件數必填');
-        setRecords(p => [{ id: genId(), ...form }, ...p]);
+        setRecords(p => [{ id: genId(), ...form, quantity: Number(form.quantity) }, ...p]);
         setForm({ ...form, name: '', quantity: '', note: '' });
         showToast('✅ 已加入清單');
       };
@@ -726,8 +741,6 @@
       const [editingStore, setEditingStore] = useState(null);
       const [editingMarket, setEditingMarket] = useState(null);
       const [editingReserve, setEditingReserve] = useState(null);
-      
-      // 轉移視窗加入 isFreeShipping, giftType, giftQty
       const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
 
       useEffect(() => localStorage.setItem('xq_store', JSON.stringify(storeRecords)), [storeRecords]);
@@ -772,7 +785,7 @@
         const newRec = {
           id: genId(), date: getToday(), name: record.name, amount: autoAmount,
           storeType, isFreeShipping, shippingFee: fee, status: 'pending',
-          giftType, giftQty: giftType !== '無' ? (giftQty || '1') : '' // 寫入贈品資訊
+          giftType, giftQty: giftType !== '無' ? (giftQty || '1') : ''
         };
         
         setStoreRecords(p => [newRec, ...p]);
@@ -813,7 +826,7 @@
             </div>
           )}
 
-          {/* 留貨單勾選連動彈窗 */}
+          {/* 留貨轉超商彈窗 */}
           {transferModal.isOpen && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
               <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
@@ -829,13 +842,12 @@
                   <option value={true}>運費：免運 (+0)</option>
                 </select>
 
-                <p className="text-xs font-bold text-gray-500 mb-2">寄件超商：</p>
+                <p className="text-xs font-bold text-gray-500 mb-2">請選擇寄件超商：</p>
                 <select value={transferModal.storeType} onChange={e=>setTransferModal({...transferModal, storeType: e.target.value})} className={INPUT_STYLE + " mb-3"}>
                   <option value="7-11">7-11 (運費$38)</option>
                   <option value="全家">全家 (運費$39)</option>
                 </select>
 
-                {/* 🎁 轉入時選填贈品 */}
                 <p className="text-xs font-bold text-gray-500 mb-2">🎁 搭配贈品：</p>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   <select value={transferModal.giftType} onChange={e=>setTransferModal({...transferModal, giftType: e.target.value})} className={INPUT_STYLE}>
@@ -846,7 +858,7 @@
                     <option value="包包">包包 (贈品)</option>
                     <option value="其他">其他 (贈品)</option>
                   </select>
-                  <input type="number" placeholder="贈品數量" value={transferModal.giftQty} onChange={e=>setTransferModal({...transferModal, giftQty: e.target.value})} className={INPUT_STYLE} />
+                  <input type="number" placeholder="數量" value={transferModal.giftQty} onChange={e=>setTransferModal({...transferModal, giftQty: e.target.value})} className={INPUT_STYLE} />
                 </div>
 
                 <div className="flex gap-3">
@@ -865,9 +877,8 @@
                 <div className="space-y-3">
                   <input type="date" value={editingStore.date} onChange={e=>setEditingStore({...editingStore, date:e.target.value})} className={INPUT_STYLE}/>
                   <input type="text" value={editingStore.name} onChange={e=>setEditingStore({...editingStore, name:e.target.value})} className={INPUT_STYLE}/>
-                  <input type="number" placeholder="代收總金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:e.target.value})} className={INPUT_STYLE}/>
+                  <input type="number" placeholder="代收總金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:Number(e.target.value)})} className={INPUT_STYLE}/>
                   
-                  {/* 編輯時也可以修改贈品 */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingStore.giftType || '無'} onChange={e=>setEditingStore({...editingStore, giftType:e.target.value})} className={INPUT_STYLE}>
                       <option value="無">無贈品</option>
@@ -877,7 +888,7 @@
                       <option value="包包">包包</option>
                       <option value="其他">其他</option>
                     </select>
-                    <input type="number" placeholder="贈品數量" value={editingStore.giftQty || ''} onChange={e=>setEditingStore({...editingStore, giftQty:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="數量" value={editingStore.giftQty || ''} onChange={e=>setEditingStore({...editingStore, giftQty:e.target.value})} className={INPUT_STYLE}/>
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -898,11 +909,11 @@
                   <input type="date" value={editingMarket.date} onChange={e=>setEditingMarket({...editingMarket, date:e.target.value})} className={INPUT_STYLE}/>
                   <div className="grid grid-cols-2 gap-2">
                     <input type="text" placeholder="地點" value={editingMarket.location} onChange={e=>setEditingMarket({...editingMarket, location:e.target.value})} className={INPUT_STYLE}/>
-                    <input type="number" placeholder="業績" value={editingMarket.perf} onChange={e=>setEditingMarket({...editingMarket, perf:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="業績" value={editingMarket.perf} onChange={e=>setEditingMarket({...editingMarket, perf:Number(e.target.value)})} className={INPUT_STYLE}/>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:e.target.value})} className={INPUT_STYLE}/>
-                    <input type="text" placeholder="備註" value={editingMarket.note} onChange={e=>setEditingMarket({...editingMarket, note:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:Number(e.target.value)})} className={INPUT_STYLE}/>
+                    <input type="text" placeholder="備註" value={editingMarket.note || ''} onChange={e=>setEditingMarket({...editingMarket, note:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <input type="number" placeholder="電費" value={editingMarket.elec || ''} onChange={e=>setEditingMarket({...editingMarket, elec:e.target.value})} className={INPUT_STYLE}/>
@@ -912,8 +923,7 @@
                     <input type="number" placeholder="油錢" value={editingMarket.gas || ''} onChange={e=>setEditingMarket({...editingMarket, gas:e.target.value})} className={INPUT_STYLE}/>
                     <input type="number" placeholder="過路費" value={editingMarket.toll || ''} onChange={e=>setEditingMarket({...editingMarket, toll:e.target.value})} className={INPUT_STYLE}/>
                   </div>
-                  
-                  {/* 編輯時也可以修改贈品 */}
+
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingMarket.giftType || '無'} onChange={e=>setEditingMarket({...editingMarket, giftType:e.target.value})} className={INPUT_STYLE}>
                       <option value="無">無贈品</option>
@@ -923,7 +933,7 @@
                       <option value="包包">包包</option>
                       <option value="其他">其他</option>
                     </select>
-                    <input type="number" placeholder="贈品數量" value={editingMarket.giftQty || ''} onChange={e=>setEditingMarket({...editingMarket, giftQty:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="數量" value={editingMarket.giftQty || ''} onChange={e=>setEditingMarket({...editingMarket, giftQty:e.target.value})} className={INPUT_STYLE}/>
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -935,6 +945,7 @@
             </div>
           )}
 
+          {/* ✏️ 編輯留貨單 */}
           {editingReserve && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
               <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
@@ -943,8 +954,8 @@
                   <input type="date" value={editingReserve.date} onChange={e=>setEditingReserve({...editingReserve, date:e.target.value})} className={INPUT_STYLE}/>
                   <input type="text" value={editingReserve.name} placeholder="姓名" onChange={e=>setEditingReserve({...editingReserve, name:e.target.value})} className={INPUT_STYLE}/>
                   <div className="grid grid-cols-2 gap-2">
-                    <input type="number" placeholder="件數" value={editingReserve.quantity} onChange={e=>setEditingReserve({...editingReserve, quantity:e.target.value})} className={INPUT_STYLE}/>
-                    <input type="text" placeholder="備註" value={editingReserve.note} onChange={e=>setEditingReserve({...editingReserve, note:e.target.value})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="件數" value={editingReserve.quantity} onChange={e=>setEditingReserve({...editingReserve, quantity:Number(e.target.value)})} className={INPUT_STYLE}/>
+                    <input type="text" placeholder="備註" value={editingReserve.note || ''} onChange={e=>setEditingReserve({...editingReserve, note:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="flex gap-3 pt-2">
                     <button onClick={()=>setEditingReserve(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
@@ -962,6 +973,7 @@
             {activeTab === 'reserve' && <ReserveTab records={reserveRecords} setRecords={setReserveRecords} setEditingReserve={setEditingReserve} showToast={showToast} onCheckBoxClick={(r) => setTransferModal({ isOpen: true, record: r, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' })} />}
           </main>
 
+          {/* 底部導覽 */}
           <nav className="fixed bottom-0 w-full bg-white border-t flex justify-around shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-40 pb-[env(safe-area-inset-bottom)]">
             <button onClick={() => setActiveTab('store')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'store' ? 'tab-active' : 'tab-inactive'}`}>🏪 超商</button>
             <button onClick={() => setActiveTab('market')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'market' ? 'tab-active' : 'tab-inactive'}`}>🛒 市場</button>
