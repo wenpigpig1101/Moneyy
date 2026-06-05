@@ -108,7 +108,7 @@
             <div className="space-y-3">
               <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
               <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
-              <input type="number" placeholder="金額 (含運費)" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
+              <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
               <div className="grid grid-cols-2 gap-3">
                 <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
                   <option value="7-11">7-11 (運費$38)</option>
@@ -171,7 +171,7 @@
           {/* 已寄出清單 */}
           <div>
             <h3 className="text-gray-400 font-bold mb-3">✅ 已寄出</h3>
-            <div className="space-y-2 opacity-80">
+            <div className="space-y-2 opacity-85">
               {shippedList.map(r => (
                 <div key={r.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex justify-between items-center">
                   <div>
@@ -201,14 +201,18 @@
     }
 
     // ==========================================
-    // 2. 市場營業分頁 (MarketTab) - 升級日曆與雜支贈品版
+    // 2. 市場營業分頁 (MarketTab) - 升級日曆、雜支、贈品與配飾販售
     // ==========================================
     function MarketTab({ records, setRecords, setEditingMarket, showToast }) {
       const [selectedDate, setSelectedDate] = useState(getToday());
       const [calMonth, setCalMonth] = useState(new Date(selectedDate).getMonth() + 1);
       const [calYear, setCalYear] = useState(new Date(selectedDate).getFullYear());
 
-      const [form, setForm] = useState({ date: selectedDate, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '' });
+      const [form, setForm] = useState({ 
+        date: selectedDate, location: '', perf: '', rent: '', note: '', 
+        elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '',
+        sellNecklace: '', sellHat: '', sellBag: '', sellOther: '' 
+      });
 
       const handleDateSelect = (dateStr) => {
         setSelectedDate(dateStr);
@@ -228,8 +232,19 @@
 
       const addRec = () => {
         if (!form.location || !form.perf || !form.rent) return showToast('⚠️ 地點、業績與位租必填');
-        setRecords(p => [{ id: genId(), ...form, perf: Number(form.perf), rent: Number(form.rent) }, ...p]);
-        setForm(f => ({ ...f, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '' }));
+        setRecords(p => [{ 
+          id: genId(), ...form, 
+          perf: Number(form.perf), 
+          rent: Number(form.rent),
+          sellNecklace: Number(form.sellNecklace || 0),
+          sellHat: Number(form.sellHat || 0),
+          sellBag: Number(form.sellBag || 0),
+          sellOther: Number(form.sellOther || 0)
+        }, ...p]);
+        setForm(f => ({ 
+          ...f, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '',
+          sellNecklace: '', sellHat: '', sellBag: '', sellOther: ''
+        }));
         showToast('✅ 已新增市場紀錄');
       };
 
@@ -266,6 +281,12 @@
         return acc;
       }, {});
 
+      // 當日售出配飾
+      const dailyNecklace = selectedRecords.reduce((sum, r) => sum + Number(r.sellNecklace || 0), 0);
+      const dailyHat = selectedRecords.reduce((sum, r) => sum + Number(r.sellHat || 0), 0);
+      const dailyBag = selectedRecords.reduce((sum, r) => sum + Number(r.sellBag || 0), 0);
+      const dailyOther = selectedRecords.reduce((sum, r) => sum + Number(r.sellOther || 0), 0);
+
       const formatPerf = (numStr) => {
         const n = Number(numStr);
         if (n >= 10000) return (n / 10000).toFixed(1).replace('.0', '') + '萬';
@@ -296,8 +317,6 @@
                 <input type="number" placeholder="位租" value={form.rent} onChange={e=>setForm({...form, rent:e.target.value})} className={INPUT_STYLE} />
                 <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
               </div>
-              
-              {/* 選填欄位：雜支 */}
               <div className="grid grid-cols-2 gap-3">
                 <input type="number" placeholder="電費 (選填)" value={form.elec} onChange={e=>setForm({...form, elec:e.target.value})} className={INPUT_STYLE} />
                 <input type="number" placeholder="清潔費 (選填)" value={form.clean} onChange={e=>setForm({...form, clean:e.target.value})} className={INPUT_STYLE} />
@@ -320,11 +339,34 @@
                 <input type="number" placeholder="贈品數量" value={form.giftQty} onChange={e=>setForm({...form, giftQty:e.target.value})} className={INPUT_STYLE} />
               </div>
 
+              {/* 💎 販售配飾數量欄位 (只計數量，不入營業額) */}
+              <div className="border-t border-gray-100 pt-3">
+                <label className="block text-xs font-bold text-gray-500 mb-2">💎 配飾販售數量 (只計數量，不計入業績)</label>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1 text-center">項鍊</span>
+                    <input type="number" placeholder="0" value={form.sellNecklace} onChange={e=>setForm({...form, sellNecklace:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-sm w-full bg-white outline-none focus:border-[#C3A995]" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1 text-center">帽子</span>
+                    <input type="number" placeholder="0" value={form.sellHat} onChange={e=>setForm({...form, sellHat:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-sm w-full bg-white outline-none focus:border-[#C3A995]" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1 text-center">包包</span>
+                    <input type="number" placeholder="0" value={form.sellBag} onChange={e=>setForm({...form, sellBag:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-sm w-full bg-white outline-none focus:border-[#C3A995]" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1 text-center">其他</span>
+                    <input type="number" placeholder="0" value={form.sellOther} onChange={e=>setForm({...form, sellOther:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-sm w-full bg-white outline-none focus:border-[#C3A995]" />
+                  </div>
+                </div>
+              </div>
+
               <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold mt-2">儲存紀錄</button>
             </div>
           </div>
 
-          {/* 📅 業績日曆 */}
+          {/* 📅 業績月日曆 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <button onClick={handlePrevMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">◀</button>
@@ -371,16 +413,15 @@
             </div>
           </div>
 
-          {/* 📍 當日明細清單與當日統計 */}
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-[#5C4D42] mb-3 flex items-center gap-2">
               📍 {calMonth}/{Number(selectedDate.split('-')[2])} 營業紀錄
               <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{selectedRecords.length} 筆</span>
             </h4>
 
-            {/* 當日總結 */}
+            {/* 當日統計卡片 */}
             {selectedRecords.length > 0 && (
-              <div className="bg-[#FDFBF7] p-3 rounded-xl border border-[#E3D5CA] text-sm text-[#5C4D42] mb-3 shadow-sm space-y-1">
+              <div className="bg-[#FDFBF7] p-3 rounded-xl border border-[#E3D5CA] text-sm text-[#5C4D42] mb-3 shadow-sm space-y-1.5 animate-fade-in">
                 <div className="flex justify-between font-bold pb-1 border-b border-[#E3D5CA]/50">
                   <span>當日總業績: ${dailyPerf}</span>
                   <span className="text-[#C3A995]">當日實賺: ${dailyNet.toFixed(0)}</span>
@@ -392,6 +433,15 @@
                 {Object.keys(dailyGifts).length > 0 && (
                   <div className="text-xs text-green-600 font-bold pt-1 border-t border-dashed border-[#E3D5CA]/40">
                     🎁 當日送出贈品：{Object.entries(dailyGifts).map(([type, qty]) => `${type} x${qty}`).join(' | ')}
+                  </div>
+                )}
+                {(dailyNecklace > 0 || dailyHat > 0 || dailyBag > 0 || dailyOther > 0) && (
+                  <div className="text-xs text-blue-600 font-bold pt-1 border-t border-dashed border-[#E3D5CA]/40">
+                    💎 當日配飾販售 (不入業績)：
+                    {dailyNecklace > 0 && `項鍊 x${dailyNecklace} `}
+                    {dailyHat > 0 && `帽子 x${dailyHat} `}
+                    {dailyBag > 0 && `包包 x${dailyBag} `}
+                    {dailyOther > 0 && `其他 x${dailyOther} `}
                   </div>
                 )}
               </div>
@@ -408,6 +458,15 @@
                   {formatMiscText(r) && <span className="text-red-400">{formatMiscText(r)}</span>}
                   {r.giftType && r.giftType !== '無' && Number(r.giftQty) > 0 && (
                     <span className="text-green-600 font-bold">🎁 送出贈品: {r.giftType} x{r.giftQty}</span>
+                  )}
+                  {(Number(r.sellNecklace||0) > 0 || Number(r.sellHat||0) > 0 || Number(r.sellBag||0) > 0 || Number(r.sellOther||0) > 0) && (
+                    <span className="text-blue-500 font-bold">
+                      💎 售出配飾: 
+                      {Number(r.sellNecklace||0) > 0 && ` 項鍊 x${r.sellNecklace}`}
+                      {Number(r.sellHat||0) > 0 && ` 帽子 x${r.sellHat}`}
+                      {Number(r.sellBag||0) > 0 && ` 包包 x${r.sellBag}`}
+                      {Number(r.sellOther||0) > 0 && ` 其他 x${r.sellOther}`}
+                    </span>
                   )}
                 </div>
                 <div className="flex justify-end gap-3 mt-2">
@@ -428,7 +487,7 @@
     }
 
     // ==========================================
-    // 3. 報表分頁 (ReportTab) - 精準運費、贈品與目標進度
+    // 3. 報表分頁 (ReportTab) - 精準運費、贈品與配飾月度彙整
     // ==========================================
     function ReportTab({ storeRecords, marketRecords, showToast }) {
       const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -440,7 +499,7 @@
 
       useEffect(() => localStorage.setItem('xq_target', targetProfit), [targetProfit]);
 
-      // 超商結算僅計算「已出貨 (shipped)」
+      // 當月篩選數據
       const sData = storeRecords.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
       const mData = marketRecords.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
 
@@ -480,7 +539,6 @@
 
       const totalNet = sNet + mNet;
       
-      // 目標進度條只看市場實賺 mNet
       let percent = 0;
       if (targetProfit > 0) {
         percent = Math.floor((mNet / targetProfit) * 100);
@@ -491,9 +549,8 @@
       const bestMarket = mData.length > 0 ? mData.reduce((max, r) => Number(r.perf) > Number(max.perf) ? r : max, mData[0]) : null;
       const avgStoreNet = sCount > 0 ? (sNet / sCount).toFixed(0) : 0;
 
-      // --- 🎁 統計當月贈品發送總數 (超商已出貨 + 市場) ---
+      // --- 🎁 統計當月贈品發送總數 ---
       const monthlyGifts = { '衣服': 0, '項鍊': 0, '帽子': 0, '包包': 0, '其他': 0 };
-      
       sData.forEach(r => {
         if (r.giftType && r.giftType !== '無' && Number(r.giftQty) > 0) {
           monthlyGifts[r.giftType] = (monthlyGifts[r.giftType] || 0) + Number(r.giftQty);
@@ -504,8 +561,21 @@
           monthlyGifts[r.giftType] = (monthlyGifts[r.giftType] || 0) + Number(r.giftQty);
         }
       });
-
       const totalGiftsSent = Object.values(monthlyGifts).reduce((sum, q) => sum + q, 0);
+
+      // --- 💎 統計當月配飾販售總數 ---
+      let mNecklace = 0;
+      let mHat = 0;
+      let mBag = 0;
+      let mOther = 0;
+
+      mData.forEach(r => {
+        mNecklace += Number(r.sellNecklace || 0);
+        mHat += Number(r.sellHat || 0);
+        mBag += Number(r.sellBag || 0);
+        mOther += Number(r.sellOther || 0);
+      });
+      const totalAccessoriesSold = mNecklace + mHat + mBag + mOther;
 
       const copyReport = () => {
         const giftListText = Object.entries(monthlyGifts)
@@ -513,7 +583,14 @@
           .map(([type, q]) => `${type} x${q}`)
           .join(', ');
 
-        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)} (含雜支扣除)\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}\n🎁 送出贈品總計：${totalGiftsSent > 0 ? giftListText : '無'}`;
+        let accListText = [];
+        if (mNecklace > 0) accListText.push(`項鍊 x${mNecklace}`);
+        if (mHat > 0) accListText.push(`帽子 x${mHat}`);
+        if (mBag > 0) accListText.push(`包包 x${mBag}`);
+        if (mOther > 0) accListText.push(`其他 x${mOther}`);
+        const accText = accListText.length > 0 ? accListText.join(', ') : '無';
+
+        const text = `【${year}年 ${month}月 營運總結】\n📦 超商實賺：$${sNet.toFixed(0)} (${sCount}件)\n🛒 市場實賺：$${mNet.toFixed(0)} (已扣位租與雜支)\n🏆 最佳市場：${bestMarket ? bestMarket.location : '無'}\n🎁 送出贈品：${totalGiftsSent > 0 ? giftListText : '無'}\n💎 售出配飾：${accText}`;
         
         const textArea = document.createElement("textarea");
         textArea.value = text;
@@ -523,7 +600,7 @@
           document.execCommand('copy');
           showToast('📋 報表已複製，可直接貼上至 LINE');
         } catch (err) {
-          showToast('❌ 複製失敗，請手動圈選');
+          showToast('❌ 複製失敗，請手動複製');
         }
         document.body.removeChild(textArea);
       };
@@ -563,7 +640,6 @@
             </select>
           </div>
 
-          {/* 🎯 目標進度條 (只看市場) */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold text-[#5C4D42] flex items-center gap-1">🎯 市場目標進度</span>
@@ -580,7 +656,6 @@
             </div>
           </div>
 
-          {/* 超商結算報表 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between items-end">
               <span>📦 超商結算 <span className="text-xs text-gray-400 font-normal">(僅計已出貨)</span></span>
@@ -600,7 +675,6 @@
             </div>
           </div>
 
-          {/* 市場結算報表 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-4 border-b border-gray-100 pb-2 flex justify-between">
               <span>🛒 市場結算</span>
@@ -611,6 +685,42 @@
               <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>總位租</span><strong className="text-red-500">-${mRent}</strong></div>
               <div className="flex justify-between bg-gray-50 p-2.5 rounded-lg col-span-2"><span>總雜支</span><strong className="text-red-500">-${mMisc}</strong></div>
             </div>
+          </div>
+
+          {/* 💎 販售配飾當月統計 */}
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+            <h3 className="text-[#5C4D42] font-bold mb-3 border-b border-gray-100 pb-2 flex justify-between items-center">
+              <span>💎 當月配飾販售 (不入營業額)</span>
+              <span className="text-xs text-blue-500 font-bold">本月共販售 {totalAccessoriesSold} 件</span>
+            </h3>
+            {totalAccessoriesSold > 0 ? (
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                {mNecklace > 0 && (
+                  <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl col-span-2">
+                    <span>項鍊</span><strong className="text-blue-500">{mNecklace} 條</strong>
+                  </div>
+                )}
+                {mHat > 0 && (
+                  <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl col-span-2">
+                    <span>帽子</span><strong className="text-blue-500">{mHat} 頂</strong>
+                  </div>
+                )}
+                {mBag > 0 && (
+                  <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl col-span-2">
+                    <span>包包</span><strong className="text-blue-500">{mBag} 個</strong>
+                  </div>
+                )}
+                {mOther > 0 && (
+                  <div className="flex justify-between bg-gray-50 p-2.5 rounded-xl col-span-2">
+                    <span>其他配飾</span><strong className="text-blue-500">{mOther} 件</strong>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 text-xs py-4">
+                本月尚未售出任何配飾喔！
+              </div>
+            )}
           </div>
 
           {/* 🎁 當月贈品統計 */}
@@ -741,6 +851,7 @@
       const [editingStore, setEditingStore] = useState(null);
       const [editingMarket, setEditingMarket] = useState(null);
       const [editingReserve, setEditingReserve] = useState(null);
+      
       const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
 
       useEffect(() => localStorage.setItem('xq_store', JSON.stringify(storeRecords)), [storeRecords]);
@@ -826,7 +937,7 @@
             </div>
           )}
 
-          {/* 留貨轉超商彈窗 */}
+          {/* 留貨單轉超商彈窗 */}
           {transferModal.isOpen && (
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4 animate-fade-in">
               <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
@@ -877,7 +988,7 @@
                 <div className="space-y-3">
                   <input type="date" value={editingStore.date} onChange={e=>setEditingStore({...editingStore, date:e.target.value})} className={INPUT_STYLE}/>
                   <input type="text" value={editingStore.name} onChange={e=>setEditingStore({...editingStore, name:e.target.value})} className={INPUT_STYLE}/>
-                  <input type="number" placeholder="代收總金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:Number(e.target.value)})} className={INPUT_STYLE}/>
+                  <input type="number" placeholder="金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:Number(e.target.value)})} className={INPUT_STYLE}/>
                   
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingStore.giftType || '無'} onChange={e=>setEditingStore({...editingStore, giftType:e.target.value})} className={INPUT_STYLE}>
@@ -923,7 +1034,8 @@
                     <input type="number" placeholder="油錢" value={editingMarket.gas || ''} onChange={e=>setEditingMarket({...editingMarket, gas:e.target.value})} className={INPUT_STYLE}/>
                     <input type="number" placeholder="過路費" value={editingMarket.toll || ''} onChange={e=>setEditingMarket({...editingMarket, toll:e.target.value})} className={INPUT_STYLE}/>
                   </div>
-
+                  
+                  {/* 編輯時也可以修改贈品 */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingMarket.giftType || '無'} onChange={e=>setEditingMarket({...editingMarket, giftType:e.target.value})} className={INPUT_STYLE}>
                       <option value="無">無贈品</option>
@@ -934,6 +1046,29 @@
                       <option value="其他">其他</option>
                     </select>
                     <input type="number" placeholder="數量" value={editingMarket.giftQty || ''} onChange={e=>setEditingMarket({...editingMarket, giftQty:e.target.value})} className={INPUT_STYLE}/>
+                  </div>
+
+                  {/* 編輯時也可以修改配飾販售數量 */}
+                  <div className="border-t border-gray-100 pt-3">
+                    <label className="block text-xs font-bold text-gray-500 mb-2">💎 編輯配飾販售數量 (不計入業績)</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1 text-center">項鍊</span>
+                        <input type="number" value={editingMarket.sellNecklace || ''} onChange={e=>setEditingMarket({...editingMarket, sellNecklace:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-xs w-full bg-white" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1 text-center">帽子</span>
+                        <input type="number" value={editingMarket.sellHat || ''} onChange={e=>setEditingMarket({...editingMarket, sellHat:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-xs w-full bg-white" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1 text-center">包包</span>
+                        <input type="number" value={editingMarket.sellBag || ''} onChange={e=>setEditingMarket({...editingMarket, sellBag:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-xs w-full bg-white" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block mb-1 text-center">其他</span>
+                        <input type="number" value={editingMarket.sellOther || ''} onChange={e=>setEditingMarket({...editingMarket, sellOther:e.target.value})} className="p-2 border border-gray-200 rounded-xl text-center text-xs w-full bg-white" />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -988,5 +1123,3 @@
   </script>
 </body>
 </html>
-
-```
