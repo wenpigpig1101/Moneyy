@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>💰 向錢衝</title>
   
+  <!-- 替換為更穩定且相容性更高的 cdnjs -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#C3A995">
@@ -31,6 +32,7 @@
       width: 100%;
       max-width: 100vw;
       overflow-x: hidden !important;
+      min-height: 100vh;
     }
     .pb-safe { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -45,10 +47,28 @@
     input[type="date"] { min-height: 3rem; }
     .tab-active { color: #C3A995; border-bottom: 2px solid #C3A995; font-weight: bold; }
     .tab-inactive { color: #A0A0A0; border-bottom: 2px solid transparent; font-weight: normal; }
+    
+    /* 載入中畫面樣式 */
+    .loading-container {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; color: #C3A995; font-weight: bold;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3; border-top: 4px solid #C3A995; border-radius: 50%;
+      width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 1rem;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- 如果 React 未成功載入，會顯示這個畫面 -->
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>系統載入中...</p>
+      <p style="font-size: 12px; color: #A0A0A0; margin-top: 10px;">如果持續停留，請檢查網路連線</p>
+    </div>
+  </div>
 
   <script type="text/babel">
     const { useState, useEffect } = React;
@@ -68,7 +88,7 @@
     const safeGetNum = (key, defaultVal) => {
       try {
         const item = window.localStorage.getItem(key);
-        if (!item || item === 'null') return defaultVal;
+        if (!item || item === 'null' || item === 'undefined') return defaultVal;
         const parsed = JSON.parse(item);
         return !isNaN(Number(parsed)) ? Number(parsed) : defaultVal;
       } catch (error) {
@@ -79,7 +99,9 @@
     const safeSetItem = (key, value) => {
       try {
         window.localStorage.setItem(key, JSON.stringify(value));
-      } catch (error) {}
+      } catch (error) {
+        console.error("無法儲存資料:", error);
+      }
     };
 
     const INPUT_STYLE = "p-3 border border-gray-200 rounded-xl outline-none focus:border-[#C3A995] text-gray-800 text-sm w-full bg-white";
@@ -92,7 +114,7 @@
     const genId = () => Math.random().toString(36).substr(2, 9);
     
     const formatShortDate = (dateStr) => {
-      if (!dateStr) return '';
+      if (!dateStr || typeof dateStr !== 'string') return '';
       return dateStr.substring(5);
     };
 
@@ -131,7 +153,6 @@
             <div className="space-y-3">
               <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
               <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
-              {/* 金額已移除含運費字樣 */}
               <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
               <div className="grid grid-cols-2 gap-3">
                 <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
@@ -278,6 +299,7 @@
 
       const safeRecords = Array.isArray(records) ? records : [];
       const recordsByDate = safeRecords.reduce((acc, r) => {
+        if (!r.date) return acc;
         acc[r.date] = acc[r.date] || [];
         acc[r.date].push(r);
         return acc;
@@ -400,7 +422,7 @@
                 const dayRecords = recordsByDate[dateStr] || [];
                 const hasRecord = dayRecords.length > 0;
                 const isSelected = dateStr === selectedDate;
-                const totalPerf = dayRecords.reduce((sum, r) => sum + Number(r.perf), 0);
+                const totalPerf = dayRecords.reduce((sum, r) => sum + Number(r.perf || 0), 0);
 
                 return (
                   <div
@@ -426,7 +448,7 @@
 
           <div className="space-y-2">
             <h4 className="text-sm font-bold text-[#5C4D42] mb-3 flex items-center gap-2">
-              📍 {calMonth}/{Number(selectedDate.split('-')[2])} 營業紀錄
+              📍 {calMonth}/{Number((selectedDate || '0-0-0').split('-')[2])} 營業紀錄
               <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{selectedRecords.length} 筆</span>
             </h4>
 
@@ -512,8 +534,8 @@
       const safeStore = Array.isArray(storeRecords) ? storeRecords : [];
       const safeMarket = Array.isArray(marketRecords) ? marketRecords : [];
 
-      const sData = safeStore.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
-      const mData = safeMarket.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+      const sData = safeStore.filter(r => r.status === 'shipped' && r.date && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+      const mData = safeMarket.filter(r => r.date && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
 
       let sCount = sData.length;
       let sTotalAmt = 0;           
@@ -553,7 +575,7 @@
       if (targetProfit > 0) {
         percent = Math.floor((mNet / targetProfit) * 100);
       }
-      const barWidth = percent > 100 ? 100 : percent;
+      const barWidth = percent > 100 ? 100 : (percent < 0 ? 0 : percent); // 防止進度條因為負數壞掉
 
       const marketDays = mData.length;
       const bestMarket = mData.length > 0 ? mData.reduce((max, r) => Number(r.perf) > Number(max.perf) ? r : max, mData[0]) : null;
@@ -894,6 +916,7 @@
       };
 
       const confirmTransfer = () => {
+        if (!transferModal.record) return;
         const { record, storeType, isFreeShipping, giftType, giftQty } = transferModal;
         
         const baseAmount = Number(record.quantity) * 200;
@@ -1124,8 +1147,14 @@
       );
     }
     
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    // 加上錯誤捕捉，確保即便有問題也能提示
+    try {
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    } catch(err) {
+      document.getElementById('root').innerHTML = '<div style="padding: 20px; color: red;">發生錯誤無法載入，請確認瀏覽器支援 JavaScript，或使用無痕模式開啟重試。</div>';
+      console.error(err);
+    }
   </script>
 </body>
 </html>
