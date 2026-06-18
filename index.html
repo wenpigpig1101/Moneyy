@@ -15,8 +15,6 @@
   
   <style>
     ::-webkit-scrollbar { display: none; }
-    
-    /* 終極防左右晃動設定 */
     html, body {
       width: 100%;
       max-width: 100vw;
@@ -27,18 +25,16 @@
       color: #5C4D42; 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
       -webkit-tap-highlight-color: transparent;
-      touch-action: pan-y; /* 核心：告訴手機只能上下滑，徹底禁止左右觸控滑動 */
+      touch-action: pan-y; 
     }
     #root {
       width: 100%;
       max-width: 100vw;
       overflow-x: hidden !important;
     }
-
     .pb-safe { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom)); }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-    
     input[type="date"], input[type="text"], input[type="number"], select {
       -webkit-appearance: none;
       appearance: none;
@@ -47,7 +43,6 @@
       width: 100%;
     }
     input[type="date"] { min-height: 3rem; }
-    
     .tab-active { color: #C3A995; border-bottom: 2px solid #C3A995; font-weight: bold; }
     .tab-inactive { color: #A0A0A0; border-bottom: 2px solid transparent; font-weight: normal; }
   </style>
@@ -58,9 +53,37 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
+    // --- 極致安全資料讀取 (防白畫面當機核心) ---
+    const safeGetArray = (key) => {
+      try {
+        const item = window.localStorage.getItem(key);
+        if (!item || item === 'null' || item === 'undefined') return [];
+        const parsed = JSON.parse(item);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    };
+    
+    const safeGetNum = (key, defaultVal) => {
+      try {
+        const item = window.localStorage.getItem(key);
+        if (!item || item === 'null') return defaultVal;
+        const parsed = JSON.parse(item);
+        return !isNaN(Number(parsed)) ? Number(parsed) : defaultVal;
+      } catch (error) {
+        return defaultVal;
+      }
+    };
+
+    const safeSetItem = (key, value) => {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      } catch (error) {}
+    };
+
     const INPUT_STYLE = "p-3 border border-gray-200 rounded-xl outline-none focus:border-[#C3A995] text-gray-800 text-sm w-full bg-white";
     
-    // 取得今天日期 YYYY-MM-DD
     const getToday = () => {
       const d = new Date();
       const pad = (n) => String(n).padStart(2, '0');
@@ -74,21 +97,22 @@
     };
 
     // ==========================================
-    // 1. 超商寄件分頁 (StoreTab) - 垂直一頁式
+    // 1. 超商寄件分頁
     // ==========================================
     function StoreTab({ records, setRecords, setEditingStore, showToast }) {
       const [form, setForm] = useState({ date: getToday(), name: '', amount: '', storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
+      const safeRecords = Array.isArray(records) ? records : [];
 
       const addRec = () => {
         if (!form.name || !form.amount) return showToast('⚠️ 姓名與金額必填');
         const fee = form.storeType === '7-11' ? 38 : 39;
-        setRecords(p => [{ id: genId(), ...form, amount: Number(form.amount), shippingFee: fee, status: 'pending' }, ...p]);
+        setRecords(p => [{ id: genId(), ...form, amount: Number(form.amount), shippingFee: fee, status: 'pending' }, ...(Array.isArray(p)?p:[])]);
         setForm({ ...form, name: '', amount: '', giftType: '無', giftQty: '' });
         showToast('✅ 已新增未寄出訂單');
       };
 
       const toggleStatus = (id) => {
-        setRecords(p => p.map(r => {
+        setRecords(p => (Array.isArray(p)?p:[]).map(r => {
           if (r.id === id) {
             const currentStatus = r.status || 'pending';
             return { ...r, status: currentStatus === 'pending' ? 'shipped' : 'pending' };
@@ -97,17 +121,17 @@
         }));
       };
 
-      const pendingList = records.filter(r => (r.status || 'pending') === 'pending');
-      const shippedList = records.filter(r => r.status === 'shipped');
+      const pendingList = safeRecords.filter(r => (r.status || 'pending') === 'pending');
+      const shippedList = safeRecords.filter(r => r.status === 'shipped');
 
       return (
         <div className="animate-fade-in space-y-6">
-          {/* 新增表單 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
             <h2 className="text-[#5C4D42] font-bold mb-3">📦 新增寄件</h2>
             <div className="space-y-3">
               <input type="date" value={form.date} onChange={e=>setForm({...form, date:e.target.value})} className={INPUT_STYLE} />
               <input type="text" placeholder="顧客姓名" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className={INPUT_STYLE} />
+              {/* 金額已移除含運費字樣 */}
               <input type="number" placeholder="金額" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className={INPUT_STYLE} />
               <div className="grid grid-cols-2 gap-3">
                 <select value={form.storeType} onChange={e=>setForm({...form, storeType:e.target.value})} className={INPUT_STYLE}>
@@ -120,7 +144,6 @@
                 </select>
               </div>
 
-              {/* 🎁 贈品選填 */}
               <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
                 <select value={form.giftType} onChange={e=>setForm({...form, giftType:e.target.value})} className={INPUT_STYLE}>
                   <option value="無">🎁 無贈品</option>
@@ -133,11 +156,10 @@
                 <input type="number" placeholder="贈品數量" value={form.giftQty} onChange={e=>setForm({...form, giftQty:e.target.value})} className={INPUT_STYLE} />
               </div>
 
-              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">新增寄件</button>
+              <button type="button" onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">新增寄件</button>
             </div>
           </div>
 
-          {/* 未寄出清單 */}
           <div>
             <h3 className="text-[#5C4D42] font-bold mb-3 flex items-center gap-2">📌 未寄出 <span className="bg-[#C3A995] text-white text-xs px-2 py-1 rounded-full">{pendingList.length}</span></h3>
             <div className="space-y-2">
@@ -154,12 +176,10 @@
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <button onClick={()=>toggleStatus(r.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-full font-bold shadow-sm">
-                      確認寄出
-                    </button>
+                    <button type="button" onClick={()=>toggleStatus(r.id)} className="text-xs bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-full font-bold shadow-sm">確認寄出</button>
                     <div className="flex gap-3 mt-1">
-                      <button onClick={()=>setEditingStore(r)} className="text-xs text-blue-500 font-bold">編輯</button>
-                      <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-gray-400 font-bold">刪除</button>
+                      <button type="button" onClick={()=>setEditingStore(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                      <button type="button" onClick={()=>setRecords(p=>(Array.isArray(p)?p:[]).filter(x=>x.id!==r.id))} className="text-xs text-gray-400 font-bold">刪除</button>
                     </div>
                   </div>
                 </div>
@@ -168,7 +188,6 @@
             </div>
           </div>
 
-          {/* 已寄出清單 */}
           <div>
             <h3 className="text-gray-400 font-bold mb-3">✅ 已寄出</h3>
             <div className="space-y-2 opacity-85">
@@ -184,11 +203,9 @@
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <button onClick={()=>toggleStatus(r.id)} className="text-xs bg-gray-200 text-gray-500 px-3 py-1 rounded-full font-bold">
-                      復原為未寄出
-                    </button>
+                    <button type="button" onClick={()=>toggleStatus(r.id)} className="text-xs bg-gray-200 text-gray-500 px-3 py-1 rounded-full font-bold">復原為未寄出</button>
                     <div className="flex gap-3 mt-1">
-                      <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                      <button type="button" onClick={()=>setRecords(p=>(Array.isArray(p)?p:[]).filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
                     </div>
                   </div>
                 </div>
@@ -201,7 +218,7 @@
     }
 
     // ==========================================
-    // 2. 市場營業分頁 (MarketTab) - 升級日曆、雜支、贈品與配飾販售
+    // 2. 市場營業分頁 (MarketTab)
     // ==========================================
     function MarketTab({ records, setRecords, setEditingMarket, showToast }) {
       const [selectedDate, setSelectedDate] = useState(getToday());
@@ -240,7 +257,7 @@
           sellHat: Number(form.sellHat || 0),
           sellBag: Number(form.sellBag || 0),
           sellOther: Number(form.sellOther || 0)
-        }, ...p]);
+        }, ...(Array.isArray(p)?p:[])]);
         setForm(f => ({ 
           ...f, location: '', perf: '', rent: '', note: '', elec: '', clean: '', gas: '', toll: '', giftType: '無', giftQty: '',
           sellNecklace: '', sellHat: '', sellBag: '', sellOther: ''
@@ -259,7 +276,8 @@
       const firstDay = new Date(calYear, calMonth - 1, 1).getDay(); 
       const daysInMonth = new Date(calYear, calMonth, 0).getDate();
 
-      const recordsByDate = records.reduce((acc, r) => {
+      const safeRecords = Array.isArray(records) ? records : [];
+      const recordsByDate = safeRecords.reduce((acc, r) => {
         acc[r.date] = acc[r.date] || [];
         acc[r.date].push(r);
         return acc;
@@ -267,13 +285,11 @@
 
       const selectedRecords = recordsByDate[selectedDate] || [];
 
-      // 計算當日總結
       const dailyPerf = selectedRecords.reduce((sum, r) => sum + Number(r.perf || 0), 0);
       const dailyRent = selectedRecords.reduce((sum, r) => sum + Number(r.rent || 0), 0);
       const dailyMisc = selectedRecords.reduce((sum, r) => sum + Number(r.elec||0) + Number(r.clean||0) + Number(r.gas||0) + Number(r.toll||0), 0);
       const dailyNet = (dailyPerf * 0.35) - dailyRent - dailyMisc;
 
-      // 當日送出贈品
       const dailyGifts = selectedRecords.reduce((acc, r) => {
         if (r.giftType && r.giftType !== '無' && Number(r.giftQty) > 0) {
           acc[r.giftType] = (acc[r.giftType] || 0) + Number(r.giftQty);
@@ -281,7 +297,6 @@
         return acc;
       }, {});
 
-      // 當日售出配飾
       const dailyNecklace = selectedRecords.reduce((sum, r) => sum + Number(r.sellNecklace || 0), 0);
       const dailyHat = selectedRecords.reduce((sum, r) => sum + Number(r.sellHat || 0), 0);
       const dailyBag = selectedRecords.reduce((sum, r) => sum + Number(r.sellBag || 0), 0);
@@ -304,7 +319,6 @@
 
       return (
         <div className="animate-fade-in space-y-5">
-          {/* 新增表單 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
             <h2 className="text-[#5C4D42] font-bold mb-3">🛒 新增市場營業</h2>
             <div className="space-y-3">
@@ -326,7 +340,6 @@
                 <input type="number" placeholder="過路費 (選填)" value={form.toll} onChange={e=>setForm({...form, toll:e.target.value})} className={INPUT_STYLE} />
               </div>
               
-              {/* 🎁 贈品選填 */}
               <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-3">
                 <select value={form.giftType} onChange={e=>setForm({...form, giftType:e.target.value})} className={INPUT_STYLE}>
                   <option value="無">🎁 無贈品</option>
@@ -339,7 +352,6 @@
                 <input type="number" placeholder="贈品數量" value={form.giftQty} onChange={e=>setForm({...form, giftQty:e.target.value})} className={INPUT_STYLE} />
               </div>
 
-              {/* 💎 販售配飾數量欄位 (只計數量，不入營業額) */}
               <div className="border-t border-gray-100 pt-3">
                 <label className="block text-xs font-bold text-gray-500 mb-2">💎 配飾販售數量 (只計數量，不計入業績)</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -362,16 +374,15 @@
                 </div>
               </div>
 
-              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold mt-2">儲存紀錄</button>
+              <button type="button" onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold mt-2">儲存紀錄</button>
             </div>
           </div>
 
-          {/* 📅 業績月日曆 */}
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
-              <button onClick={handlePrevMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">◀</button>
+              <button type="button" onClick={handlePrevMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">◀</button>
               <h3 className="font-bold text-[#5C4D42] text-base">{calYear}年 {calMonth}月</h3>
-              <button onClick={handleNextMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">▶</button>
+              <button type="button" onClick={handleNextMonth} className="text-gray-400 bg-gray-50 px-3 py-1 rounded-full hover:bg-gray-100 font-bold">▶</button>
             </div>
 
             <div className="grid grid-cols-7 gap-1 text-center mb-2">
@@ -419,7 +430,6 @@
               <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full text-[10px]">{selectedRecords.length} 筆</span>
             </h4>
 
-            {/* 當日統計卡片 */}
             {selectedRecords.length > 0 && (
               <div className="bg-[#FDFBF7] p-3 rounded-xl border border-[#E3D5CA] text-sm text-[#5C4D42] mb-3 shadow-sm space-y-1.5 animate-fade-in">
                 <div className="flex justify-between font-bold pb-1 border-b border-[#E3D5CA]/50">
@@ -470,8 +480,8 @@
                   )}
                 </div>
                 <div className="flex justify-end gap-3 mt-2">
-                  <button onClick={()=>setEditingMarket(r)} className="text-xs text-blue-500 font-bold">編輯</button>
-                  <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                  <button type="button" onClick={()=>setEditingMarket(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                  <button type="button" onClick={()=>setRecords(p=>(Array.isArray(p)?p:[]).filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
                 </div>
               </div>
             ))}
@@ -487,23 +497,24 @@
     }
 
     // ==========================================
-    // 3. 報表分頁 (ReportTab) - 精準運費、贈品與配飾月度彙整
+    // 3. 報表分頁 (ReportTab)
     // ==========================================
     function ReportTab({ storeRecords, marketRecords, showToast }) {
       const [month, setMonth] = useState(new Date().getMonth() + 1);
       const [year, setYear] = useState(new Date().getFullYear());
       
-      const [targetProfit, setTargetProfit] = useState(() => Number(localStorage.getItem('xq_target') || 100000));
+      const [targetProfit, setTargetProfit] = useState(() => safeGetNum('xq_target', 100000));
       const [showTargetModal, setShowTargetModal] = useState(false);
       const [tempTarget, setTempTarget] = useState('');
 
-      useEffect(() => localStorage.setItem('xq_target', targetProfit), [targetProfit]);
+      useEffect(() => safeSetItem('xq_target', targetProfit), [targetProfit]);
 
-      // 當月篩選數據
-      const sData = storeRecords.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
-      const mData = marketRecords.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+      const safeStore = Array.isArray(storeRecords) ? storeRecords : [];
+      const safeMarket = Array.isArray(marketRecords) ? marketRecords : [];
 
-      // --- 📌 精確統計：超商寄件 ---
+      const sData = safeStore.filter(r => r.status === 'shipped' && new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+      const mData = safeMarket.filter(r => new Date(r.date).getMonth() + 1 === month && new Date(r.date).getFullYear() === year);
+
       let sCount = sData.length;
       let sTotalAmt = 0;           
       let sItemAmountTotal = 0;    
@@ -530,7 +541,6 @@
       const sShippingProfit = sShippingCollected - sActualCost; 
       const sNet = sRev + sShippingProfit; 
 
-      // --- 📌 市場結算 ---
       const mPerf = mData.reduce((acc, r) => acc + Number(r.perf||0), 0);
       const mRev = mPerf * 0.35;
       const mRent = mData.reduce((acc, r) => acc + Number(r.rent||0), 0);
@@ -549,7 +559,6 @@
       const bestMarket = mData.length > 0 ? mData.reduce((max, r) => Number(r.perf) > Number(max.perf) ? r : max, mData[0]) : null;
       const avgStoreNet = sCount > 0 ? (sNet / sCount).toFixed(0) : 0;
 
-      // --- 🎁 統計當月贈品發送總數 ---
       const monthlyGifts = { '衣服': 0, '項鍊': 0, '帽子': 0, '包包': 0, '其他': 0 };
       sData.forEach(r => {
         if (r.giftType && r.giftType !== '無' && Number(r.giftQty) > 0) {
@@ -563,7 +572,6 @@
       });
       const totalGiftsSent = Object.values(monthlyGifts).reduce((sum, q) => sum + q, 0);
 
-      // --- 💎 統計當月配飾販售總數 ---
       let mNecklace = 0;
       let mHat = 0;
       let mBag = 0;
@@ -624,8 +632,8 @@
                 <p className="text-xs text-gray-500 mb-3">為自己設定一個有挑戰性的數字吧！</p>
                 <input type="number" value={tempTarget} onChange={e=>setTempTarget(e.target.value)} placeholder="例如: 100000" className={INPUT_STYLE + " mb-4"} />
                 <div className="flex gap-3">
-                  <button onClick={()=>setShowTargetModal(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
-                  <button onClick={saveTarget} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold">儲存目標</button>
+                  <button type="button" onClick={()=>setShowTargetModal(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
+                  <button type="button" onClick={saveTarget} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold">儲存目標</button>
                 </div>
               </div>
             </div>
@@ -643,7 +651,7 @@
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold text-[#5C4D42] flex items-center gap-1">🎯 市場目標進度</span>
-              <button onClick={()=>{setTempTarget(targetProfit); setShowTargetModal(true);}} className="text-xs bg-gray-50 border border-[#E3D5CA] px-3 py-1 rounded-full font-bold text-[#C3A995]">修改目標</button>
+              <button type="button" onClick={()=>{setTempTarget(targetProfit); setShowTargetModal(true);}} className="text-xs bg-gray-50 border border-[#E3D5CA] px-3 py-1 rounded-full font-bold text-[#C3A995]">修改目標</button>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-3.5 mb-2 overflow-hidden shadow-inner">
               <div className="bg-[#C3A995] h-3.5 rounded-full transition-all duration-700 ease-out relative" style={{ width: `${barWidth}%` }}>
@@ -687,7 +695,6 @@
             </div>
           </div>
 
-          {/* 💎 販售配飾當月統計 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-3 border-b border-gray-100 pb-2 flex justify-between items-center">
               <span>💎 當月配飾販售 (不入營業額)</span>
@@ -723,7 +730,6 @@
             )}
           </div>
 
-          {/* 🎁 當月贈品統計 */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
             <h3 className="text-[#5C4D42] font-bold mb-3 border-b border-gray-100 pb-2 flex justify-between items-center">
               <span>🎁 當月贈品統計</span>
@@ -747,11 +753,10 @@
             )}
           </div>
           
-          {/* 當月營運亮點 */}
           <div className="bg-[#C3A995] text-white p-5 rounded-2xl shadow-sm mb-6">
             <h3 className="font-bold mb-4 border-b border-white/20 pb-2 flex justify-between items-center">
               <span>✨ {month}月 營運亮點</span>
-              <button onClick={copyReport} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition-colors shadow-sm">
+              <button type="button" onClick={copyReport} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-full transition-colors shadow-sm">
                 📋 複製報表
               </button>
             </h3>
@@ -784,7 +789,7 @@
 
       const addRec = () => {
         if (!form.name || !form.quantity) return showToast('⚠️ 姓名與件數必填');
-        setRecords(p => [{ id: genId(), ...form, quantity: Number(form.quantity) }, ...p]);
+        setRecords(p => [{ id: genId(), ...form, quantity: Number(form.quantity) }, ...(Array.isArray(p) ? p : [])]);
         setForm({ ...form, name: '', quantity: '', note: '' });
         showToast('✅ 已加入清單');
       };
@@ -797,6 +802,8 @@
         }, 300);
       };
 
+      const safeRecords = Array.isArray(records) ? records : [];
+
       return (
         <div className="animate-fade-in space-y-4">
           <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E3D5CA]">
@@ -808,12 +815,12 @@
                 <input type="number" placeholder="件數" value={form.quantity} onChange={e=>setForm({...form, quantity:e.target.value})} className={INPUT_STYLE} />
                 <input type="text" placeholder="備註 (選填)" value={form.note} onChange={e=>setForm({...form, note:e.target.value})} className={INPUT_STYLE} />
               </div>
-              <button onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">加入清單</button>
+              <button type="button" onClick={addRec} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">加入清單</button>
             </div>
           </div>
 
           <div className="space-y-2">
-            {records.map(r => (
+            {safeRecords.map(r => (
               <div key={r.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
                 <div onClick={() => handleCheck(r)} 
                      className="w-6 h-6 border-2 border-[#5C4D42] bg-white rounded flex items-center justify-center cursor-pointer shrink-0 transition-all">
@@ -825,12 +832,12 @@
                   <div className="text-xs text-gray-500 mt-1">數量: {r.quantity}件 {r.note ? `| 備註: ${r.note}` : ''} <br/> {formatShortDate(r.date)}</div>
                 </div>
                 <div className="flex flex-col gap-2 items-end">
-                  <button onClick={()=>setEditingReserve(r)} className="text-xs text-blue-500 font-bold">編輯</button>
-                  <button onClick={()=>setRecords(p=>p.filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
+                  <button type="button" onClick={()=>setEditingReserve(r)} className="text-xs text-blue-500 font-bold">編輯</button>
+                  <button type="button" onClick={()=>setRecords(p=>(Array.isArray(p)?p:[]).filter(x=>x.id!==r.id))} className="text-xs text-red-400 font-bold">刪除</button>
                 </div>
               </div>
             ))}
-            {records.length === 0 && <div className="text-center text-gray-400 text-sm py-4">目前沒有留貨清單！</div>}
+            {safeRecords.length === 0 && <div className="text-center text-gray-400 text-sm py-4">目前沒有留貨清單！</div>}
           </div>
         </div>
       );
@@ -844,9 +851,9 @@
       const [showSettings, setShowSettings] = useState(false);
       const [toast, setToast] = useState('');
 
-      const [storeRecords, setStoreRecords] = useState(() => JSON.parse(localStorage.getItem('xq_store') || '[]'));
-      const [marketRecords, setMarketRecords] = useState(() => JSON.parse(localStorage.getItem('xq_market') || '[]'));
-      const [reserveRecords, setReserveRecords] = useState(() => JSON.parse(localStorage.getItem('xq_reserve') || '[]'));
+      const [storeRecords, setStoreRecords] = useState(() => safeGetArray('xq_store'));
+      const [marketRecords, setMarketRecords] = useState(() => safeGetArray('xq_market'));
+      const [reserveRecords, setReserveRecords] = useState(() => safeGetArray('xq_reserve'));
 
       const [editingStore, setEditingStore] = useState(null);
       const [editingMarket, setEditingMarket] = useState(null);
@@ -854,9 +861,9 @@
       
       const [transferModal, setTransferModal] = useState({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
 
-      useEffect(() => localStorage.setItem('xq_store', JSON.stringify(storeRecords)), [storeRecords]);
-      useEffect(() => localStorage.setItem('xq_market', JSON.stringify(marketRecords)), [marketRecords]);
-      useEffect(() => localStorage.setItem('xq_reserve', JSON.stringify(reserveRecords)), [reserveRecords]);
+      useEffect(() => safeSetItem('xq_store', storeRecords), [storeRecords]);
+      useEffect(() => safeSetItem('xq_market', marketRecords), [marketRecords]);
+      useEffect(() => safeSetItem('xq_reserve', reserveRecords), [reserveRecords]);
 
       const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -876,9 +883,9 @@
         reader.onload = (evt) => {
           try {
             const data = JSON.parse(evt.target.result);
-            if (data.storeRecords) setStoreRecords(data.storeRecords);
-            if (data.marketRecords) setMarketRecords(data.marketRecords);
-            if (data.reserveRecords) setReserveRecords(data.reserveRecords);
+            if (data.storeRecords) setStoreRecords(Array.isArray(data.storeRecords) ? data.storeRecords : []);
+            if (data.marketRecords) setMarketRecords(Array.isArray(data.marketRecords) ? data.marketRecords : []);
+            if (data.reserveRecords) setReserveRecords(Array.isArray(data.reserveRecords) ? data.reserveRecords : []);
             showToast('✅ 資料還原成功');
             setShowSettings(false);
           } catch(err) { alert('檔案格式錯誤'); }
@@ -899,12 +906,12 @@
           giftType, giftQty: giftType !== '無' ? (giftQty || '1') : ''
         };
         
-        setStoreRecords(p => [newRec, ...p]);
-        setReserveRecords(p => p.filter(r => r.id !== record.id));
+        setStoreRecords(p => [{...newRec}, ...(Array.isArray(p)?p:[])]);
+        setReserveRecords(p => (Array.isArray(p)?p:[]).filter(r => r.id !== record.id));
         setTransferModal({ isOpen: false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: '' });
         
         setActiveTab('store');
-        showToast(`✅ 已轉入未寄出清單`);
+        showToast('✅ 已轉入未寄出清單');
       };
 
       const baseTransferAmt = transferModal.record ? Number(transferModal.record.quantity) * 200 : 0;
@@ -916,7 +923,7 @@
 
           <header className="bg-[#C3A995] text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
             <h1 className="text-xl font-bold tracking-wider">💰 向錢衝</h1>
-            <button onClick={() => setShowSettings(true)} className="text-xl hover:opacity-80">⚙️</button>
+            <button type="button" onClick={() => setShowSettings(true)} className="text-xl hover:opacity-80">⚙️</button>
           </header>
 
           {showSettings && (
@@ -924,10 +931,10 @@
               <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
                 <div className="flex justify-between items-center mb-5">
                   <h3 className="font-bold text-[#5C4D42]">系統設定</h3>
-                  <button onClick={() => setShowSettings(false)} className="text-gray-400 font-bold">✖</button>
+                  <button type="button" onClick={() => setShowSettings(false)} className="text-gray-400 font-bold">✖</button>
                 </div>
                 <div className="space-y-3">
-                  <button onClick={exportData} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">📤 匯出備份 (JSON)</button>
+                  <button type="button" onClick={exportData} className="w-full bg-[#C3A995] text-white py-3 rounded-xl font-bold">📤 匯出備份 (JSON)</button>
                   <label className="block w-full border-2 border-[#C3A995] text-[#C3A995] text-center py-3 rounded-xl font-bold cursor-pointer">
                     📥 匯入資料 (換手機用)
                     <input type="file" accept=".json" onChange={importData} className="hidden" />
@@ -943,7 +950,7 @@
               <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
                 <h3 className="font-bold text-[#5C4D42] mb-3">🔄 轉入超商未寄出</h3>
                 <div className="text-sm text-gray-500 mb-4 bg-gray-50 p-3 rounded-xl leading-relaxed">
-                  將自動帶入訂購人：<strong className="text-black">{transferModal.record.name}</strong><br/>
+                  將自動帶入訂購人：<strong className="text-black">{transferModal.record ? transferModal.record.name : ''}</strong><br/>
                   系統代收金額：商品 ${baseTransferAmt} + 運費 ${transferShippingFee} = <strong className="text-black">${baseTransferAmt + transferShippingFee}</strong>
                 </div>
                 
@@ -973,8 +980,8 @@
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={()=>setTransferModal({isOpen:false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: ''})} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
-                  <button onClick={confirmTransfer} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold shadow-md">轉入清單</button>
+                  <button type="button" onClick={()=>setTransferModal({isOpen:false, record: null, storeType: '7-11', isFreeShipping: false, giftType: '無', giftQty: ''})} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">取消</button>
+                  <button type="button" onClick={confirmTransfer} className="flex-1 py-3 bg-[#C3A995] text-white rounded-xl font-bold shadow-md">轉入清單</button>
                 </div>
               </div>
             </div>
@@ -988,7 +995,7 @@
                 <div className="space-y-3">
                   <input type="date" value={editingStore.date} onChange={e=>setEditingStore({...editingStore, date:e.target.value})} className={INPUT_STYLE}/>
                   <input type="text" value={editingStore.name} onChange={e=>setEditingStore({...editingStore, name:e.target.value})} className={INPUT_STYLE}/>
-                  <input type="number" placeholder="金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:Number(e.target.value)})} className={INPUT_STYLE}/>
+                  <input type="number" placeholder="金額" value={editingStore.amount} onChange={e=>setEditingStore({...editingStore, amount:e.target.value})} className={INPUT_STYLE}/>
                   
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingStore.giftType || '無'} onChange={e=>setEditingStore({...editingStore, giftType:e.target.value})} className={INPUT_STYLE}>
@@ -1003,8 +1010,8 @@
                   </div>
 
                   <div className="flex gap-3 pt-2">
-                    <button onClick={()=>setEditingStore(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
-                    <button onClick={()=>{setStoreRecords(p=>p.map(r=>r.id===editingStore.id ? editingStore : r)); setEditingStore(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                    <button type="button" onClick={()=>setEditingStore(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button type="button" onClick={()=>{setStoreRecords(p=>(Array.isArray(p)?p:[]).map(r=>r.id===editingStore.id ? {...editingStore, amount: Number(editingStore.amount)} : r)); setEditingStore(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
                   </div>
                 </div>
               </div>
@@ -1020,10 +1027,10 @@
                   <input type="date" value={editingMarket.date} onChange={e=>setEditingMarket({...editingMarket, date:e.target.value})} className={INPUT_STYLE}/>
                   <div className="grid grid-cols-2 gap-2">
                     <input type="text" placeholder="地點" value={editingMarket.location} onChange={e=>setEditingMarket({...editingMarket, location:e.target.value})} className={INPUT_STYLE}/>
-                    <input type="number" placeholder="業績" value={editingMarket.perf} onChange={e=>setEditingMarket({...editingMarket, perf:Number(e.target.value)})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="業績" value={editingMarket.perf} onChange={e=>setEditingMarket({...editingMarket, perf:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:Number(e.target.value)})} className={INPUT_STYLE}/>
+                    <input type="number" placeholder="租金" value={editingMarket.rent} onChange={e=>setEditingMarket({...editingMarket, rent:e.target.value})} className={INPUT_STYLE}/>
                     <input type="text" placeholder="備註" value={editingMarket.note || ''} onChange={e=>setEditingMarket({...editingMarket, note:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1035,7 +1042,6 @@
                     <input type="number" placeholder="過路費" value={editingMarket.toll || ''} onChange={e=>setEditingMarket({...editingMarket, toll:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   
-                  {/* 編輯時也可以修改贈品 */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
                     <select value={editingMarket.giftType || '無'} onChange={e=>setEditingMarket({...editingMarket, giftType:e.target.value})} className={INPUT_STYLE}>
                       <option value="無">無贈品</option>
@@ -1048,7 +1054,6 @@
                     <input type="number" placeholder="數量" value={editingMarket.giftQty || ''} onChange={e=>setEditingMarket({...editingMarket, giftQty:e.target.value})} className={INPUT_STYLE}/>
                   </div>
 
-                  {/* 編輯時也可以修改配飾販售數量 */}
                   <div className="border-t border-gray-100 pt-3">
                     <label className="block text-xs font-bold text-gray-500 mb-2">💎 編輯配飾販售數量 (不計入業績)</label>
                     <div className="grid grid-cols-4 gap-2">
@@ -1072,8 +1077,8 @@
                   </div>
 
                   <div className="flex gap-3 pt-2">
-                    <button onClick={()=>setEditingMarket(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
-                    <button onClick={()=>{setMarketRecords(p=>p.map(r=>r.id===editingMarket.id ? editingMarket : r)); setEditingMarket(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                    <button type="button" onClick={()=>setEditingMarket(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button type="button" onClick={()=>{setMarketRecords(p=>(Array.isArray(p)?p:[]).map(r=>r.id===editingMarket.id ? {...editingMarket, perf: Number(editingMarket.perf), rent: Number(editingMarket.rent)} : r)); setEditingMarket(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
                   </div>
                 </div>
               </div>
@@ -1093,8 +1098,8 @@
                     <input type="text" placeholder="備註" value={editingReserve.note || ''} onChange={e=>setEditingReserve({...editingReserve, note:e.target.value})} className={INPUT_STYLE}/>
                   </div>
                   <div className="flex gap-3 pt-2">
-                    <button onClick={()=>setEditingReserve(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
-                    <button onClick={()=>{setReserveRecords(p=>p.map(r=>r.id===editingReserve.id ? editingReserve : r)); setEditingReserve(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
+                    <button type="button" onClick={()=>setEditingReserve(null)} className="flex-1 bg-gray-100 py-3 rounded-xl font-bold text-gray-500">取消</button>
+                    <button type="button" onClick={()=>{setReserveRecords(p=>(Array.isArray(p)?p:[]).map(r=>r.id===editingReserve.id ? {...editingReserve, quantity: Number(editingReserve.quantity)} : r)); setEditingReserve(null); showToast('✅ 已儲存修改');}} className="flex-1 bg-[#C3A995] text-white py-3 rounded-xl font-bold">儲存</button>
                   </div>
                 </div>
               </div>
@@ -1110,14 +1115,15 @@
 
           {/* 底部導覽 */}
           <nav className="fixed bottom-0 w-full bg-white border-t flex justify-around shadow-[0_-4px_10px_rgba(0,0,0,0.02)] z-40 pb-[env(safe-area-inset-bottom)]">
-            <button onClick={() => setActiveTab('store')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'store' ? 'tab-active' : 'tab-inactive'}`}>🏪 超商</button>
-            <button onClick={() => setActiveTab('market')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'market' ? 'tab-active' : 'tab-inactive'}`}>🛒 市場</button>
-            <button onClick={() => setActiveTab('reports')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reports' ? 'tab-active' : 'tab-inactive'}`}>📊 報表</button>
-            <button onClick={() => setActiveTab('reserve')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reserve' ? 'tab-active' : 'tab-inactive'}`}>💎 留貨</button>
+            <button type="button" onClick={() => setActiveTab('store')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'store' ? 'tab-active' : 'tab-inactive'}`}>🏪 超商</button>
+            <button type="button" onClick={() => setActiveTab('market')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'market' ? 'tab-active' : 'tab-inactive'}`}>🛒 市場</button>
+            <button type="button" onClick={() => setActiveTab('reports')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reports' ? 'tab-active' : 'tab-inactive'}`}>📊 報表</button>
+            <button type="button" onClick={() => setActiveTab('reserve')} className={`flex-1 py-4 text-center text-sm transition-colors ${activeTab === 'reserve' ? 'tab-active' : 'tab-inactive'}`}>💎 留貨</button>
           </nav>
         </div>
       );
     }
+    
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
